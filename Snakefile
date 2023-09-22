@@ -3,7 +3,7 @@ import pandas as pd
 # read in metadata file
 metadata_all = pd.read_csv("inputs/metadata.tsv", sep = "\t").set_index("run_accession", drop = False)
 # select columns that we need metadata from for wildcards and other places in the workflow
-metadata_illumina = metadata_all[["library_name", "condition", "library_layout"]]
+metadata_illumina = metadata_all[["library_name", "condition", "library_layout"]].drop_duplicates()
 # set the index to library name to allow dictionary-like lookups from the metadata tables with param lambda functions
 metadata_illumina = metadata_illumina.set_index("library_name", drop = False)
 
@@ -93,7 +93,7 @@ rule split_paired_end_reads_fastp:
     params: liblayout = lambda wildcards: metadata_illumina.loc[wildcards.illumina_lib_name, "library_layout"]
     shell:'''
     if [ "{params.liblayout}" == "PAIRED" ]; then
-        repair.sh in={input} out={output.r1} out2={output.r2} repair=t overwrite=true
+        repair.sh in={input} out={output.r1} out2={output.r2} repair=t overwrite=true -Xmx60g
     elif [ "{params.liblayout}" == "SINGLE" ]; then
         cp {input} {output.r1}
         touch {output.r2}
@@ -107,7 +107,7 @@ rule split_paired_end_reads_fastp:
 rule download_transcriptome:
 
 rule index_transcriptome:
-    input: "inputs/assembly/all_combined.fa"
+    input: "inputs/assembly/orthofuser_final_clean.fa.dammit.fasta"
     output: "outputs/quantification/salmon_index/info.json"
     threads: 1
     params: indexdir = "outputs/quantification/salmon_index/"

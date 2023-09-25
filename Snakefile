@@ -169,9 +169,9 @@ rule make_grouper_config_file:
         # use the dictionary to parse a nested string of conditions: salmon results by library name that will be written to grouper yaml
         samples_list = []
         for condition, library_names in condition_dict.items():
-            samples_list.append("\n    - " + condition)
+            samples_list.append("\n    - " + condition + ":")
             for library_name in library_names:
-                samples_list.append("\n        -" + params.salmondir + library_name + "_quant")
+                samples_list.append("\n        - " + params.salmondir + library_name + "_quant")
 
         samples_list = "".join(samples_list)
         # create a config template with format strings that will be substituted in the write process

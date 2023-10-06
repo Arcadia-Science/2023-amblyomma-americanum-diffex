@@ -14,7 +14,7 @@ RUN_ACCESSIONS = metadata_all["run_accession"].unique().tolist()
 ILLUMINA_LIB_NAMES = metadata_illumina["library_name"].unique().tolist()
 
 rule all:
-    input: "outputs/quantification/grouper/mag.flat.clust"
+    input: "outputs/quantification/corset/corset-counts.txt"
 
 ######################################
 # Download short & long read data
@@ -121,7 +121,9 @@ rule salmon_for_grouper:
         index = "outputs/quantification/salmon_index/info.json",
         r1="outputs/read_qc/fastp_separated_reads/{illumina_lib_name}_R1.fq.gz",
         r2="outputs/read_qc/fastp_separated_reads/{illumina_lib_name}_R2.fq.gz"
-    output: "outputs/quantification/salmon/{illumina_lib_name}_quant/quant.sf"
+    output: 
+        "outputs/quantification/salmon/{illumina_lib_name}_quant/quant.sf",
+        "outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt.gz"
     params: 
         liblayout = lambda wildcards: metadata_illumina.loc[wildcards.illumina_lib_name, "library_layout"],
         indexdir = "outputs/quantification/salmon_index/",
@@ -195,4 +197,20 @@ rule run_grouper:
     conda: "envs/biogrouper.yml"
     shell:'''
     Grouper --config {input}
+    '''
+
+rule gunzip_salmon_eq:
+    input: "outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt.gz"
+    output: "outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt"
+    shell:'''
+    gunzip -c {input} > {output}
+    '''
+
+rule run_corset:
+    input: expand("outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt", illumina_lib_name = ILLUMINA_LIB_NAMES)
+    output: "outputs/quantification/corset/corset-counts.txt"
+    params: outdir = "outputs/quantification/corset/corset"
+    conda: "envs/corset.yml"
+    shell:'''
+    corset -i salmon_eq_classes {input} -p {params.outdir} -f true
     '''

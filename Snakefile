@@ -112,10 +112,11 @@ rule star_index_genome:
         genome = "inputs/genome/Amblyomma_americanum_filtered_assembly.fasta",
         gff = "inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3" 
     output: "inputs/genome/SAindex"
+    params: genomedir = "inputs/genome"
     conda: "envs/star.yml"
     threads: 16
     shell:'''
-    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir genome  \
+    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {params.genomedir}  \
          --genomeFastaFiles {input.genome} --sjdbGTFfile {input.gff} \
          --sjdbGTFtagExonParentTranscript mRNA --sjdbOverhang  99
     '''
@@ -126,7 +127,7 @@ rule star_map_reads:
         fastq = expand("outputs/read_qc/fastp_separated_reads/{{illumina_lib_name}}_R{pair}.fq.gz", pair = [1, 2])
     output: "outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam"
     params: 
-        genomedir = "inputs/genome",
+        genomedir = "inputs/genome/",
         outprefix = lambda wildcards: "outputs/counts/star/" + wildcards.illumina_lib_name + "_",
         liblayout = lambda wildcards: metadata_illumina.loc[wildcards.illumina_lib_name, "library_layout"]
     threads: 4
@@ -139,7 +140,7 @@ rule star_map_reads:
         fastq_files={input.fastq[0]}
     fi
 
-    STAR --runThreadN {threads} {params.genomedir}            \
+    STAR --runThreadN {threads} --genomeDir {params.genomedir}  \
          --readFilesIn ${{fastq_files}} --outFilterType BySJout  \
          --outFilterMultimapNmax 20 --alignSJoverhangMin 8    \
          --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 \

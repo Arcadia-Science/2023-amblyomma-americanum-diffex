@@ -127,14 +127,14 @@ rule star_map_reads:
     output: "outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam"
     params: 
         genomedir = "inputs/genome",
-        outprefix = lambda wildcards: "outputs/counts/star/" + illumina_lib_name + "_",
+        outprefix = lambda wildcards: "outputs/counts/star/" + wildcards.illumina_lib_name + "_",
         liblayout = lambda wildcards: metadata_illumina.loc[wildcards.illumina_lib_name, "library_layout"]
     threads: 4
     conda: "envs/star.yml"
     shell:'''
     # define a bash variable so the STAR command only needs to be repeated once
     if [ "{params.liblayout}" == "PAIRED" ]; then
-        fastq_files={inputs.fastq}
+        fastq_files={input.fastq}
     elif [ "{params.liblayout}" == "SINGLE" ]; then
         fastq_files={input.fastq[0]}
     fi
@@ -164,7 +164,7 @@ rule htseq_count:
     output: "outputs/counts/htseq_count/{illumina_lib_name}.out"
     conda: "envs/htseq.yml"
     shell:'''
-    htseq-count -f bam {input.bam} {input.gff} -i Parent -r pos > {output}
+    htseq-count -f bam {input.bai} {input.gff} -i Parent -r pos > {output}
     '''
 
 rule combine_htseq_counts:

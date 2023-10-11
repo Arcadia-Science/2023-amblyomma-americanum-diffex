@@ -3,4 +3,4 @@ channels:
    - bioconda
    - defaults
 dependencies:
-   - corset=1.07
+   - htseq=2.0.3 

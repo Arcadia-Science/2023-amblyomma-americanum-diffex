@@ -3,4 +3,4 @@ channels:
    - bioconda
    - defaults
 dependencies:
-   - salmon=1.10.2 
+   - star=2.7.11a 

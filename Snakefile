@@ -14,7 +14,7 @@ RUN_ACCESSIONS = metadata_all["run_accession"].unique().tolist()
 ILLUMINA_LIB_NAMES = metadata_illumina["library_name"].unique().tolist()
 
 rule all:
-    input: "outputs/quantification/corset/corset-counts.txt"
+    input: "outputs/counts/raw_counts.tsv"
 
 ######################################
 # Download short & long read data
@@ -104,113 +104,73 @@ rule split_paired_end_reads_fastp:
 ## Read quantification
 ##############################################
 
-rule download_transcriptome:
+# using EVM genome annotation.
+# for now, downloaded by hand from S3 until available on zenodo.
 
-rule index_transcriptome:
-    input: "inputs/assembly/orthofuser_final_clean.fa.dammit.fasta"
-    output: "outputs/quantification/salmon_index/info.json"
-    threads: 1
-    params: indexdir = "outputs/quantification/salmon_index/"
-    conda: "envs/salmon.yml"
-    shell:'''
-    salmon index -t {input} -i {params.indexdir} -k 31
-    '''
-
-rule salmon_for_grouper:
+rule star_index_genome:
     input:
-        index = "outputs/quantification/salmon_index/info.json",
-        r1="outputs/read_qc/fastp_separated_reads/{illumina_lib_name}_R1.fq.gz",
-        r2="outputs/read_qc/fastp_separated_reads/{illumina_lib_name}_R2.fq.gz"
-    output: 
-        "outputs/quantification/salmon/{illumina_lib_name}_quant/quant.sf",
-        "outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt.gz"
-    params: 
-        liblayout = lambda wildcards: metadata_illumina.loc[wildcards.illumina_lib_name, "library_layout"],
-        indexdir = "outputs/quantification/salmon_index/",
-        outdir = lambda wildcards: "outputs/quantification/salmon/" + wildcards.illumina_lib_name + "_quant" 
-    conda: "envs/salmon.yml"
-    threads: 2
+        genome = "inputs/genome/Amblyomma_americanum_filtered_assembly.fasta",
+        gff = "inputs/genome/evm/Amblyomma_americanum_filtered_assembly.evm.gff3" 
+    output: "inputs/genome/SAindex"
+    conda: "envs/star.yml"
+    threads: 16
     shell:'''
+    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir genome  \
+         --genomeFastaFiles {input.genome} --sjdbGTFfile {input.gff} \
+         --sjdbGTFtagExonParentTranscript mRNA --sjdbOverhang  99
+    '''
+
+rule star_map_reads:
+    input:
+        genome_index = "inputs/genome/SAindex",
+        fastq = expand("outputs/read_qc/fastp_separated_reads/{{illumina_lib_name}}_R{pair}.fq.gz", pair = [1, 2])
+    output: "outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam"
+    params: 
+        genomedir = "inputs/genome",
+        outprefix = lambda wildcards: "outputs/counts/star/" + illumina_lib_name + "_",
+        liblayout = lambda wildcards: metadata_illumina.loc[wildcards.illumina_lib_name, "library_layout"]
+    threads: 4
+    conda: "envs/star.yml"
+    shell:'''
+    # define a bash variable so the STAR command only needs to be repeated once
     if [ "{params.liblayout}" == "PAIRED" ]; then
-        salmon quant -i {params.indexdir} -l A -1 {input.r1} -2 {input.r2} -o {params.outdir} --dumpEq --writeOrphanLinks -p {threads} 
+        fastq_files={inputs.fastq}
     elif [ "{params.liblayout}" == "SINGLE" ]; then
-        salmon quant -i {params.indexdir} -l A -r {input.r1} -o {params.outdir} --dumpEq --writeOrphanLinks -p {threads}
+        fastq_files={input.fastq[0]}
     fi
+
+    STAR --runThreadN {threads} {params.genomedir}            \
+         --readFilesIn ${{fastq_files}} --outFilterType BySJout  \
+         --outFilterMultimapNmax 20 --alignSJoverhangMin 8    \
+         --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 \
+         --outFilterMismatchNoverLmax 0.6 --alignIntronMin 20 \
+         --alignIntronMax 1000000 --alignMatesGapMax 1000000  \
+         --outSAMattributes NH HI NM MD --outSAMtype BAM      \
+         SortedByCoordinate --outFileNamePrefix {params.outprefix}
     '''
 
-rule make_grouper_config_file:
-    """
-    Grouper requires a config file in the following format:
-    conditions:
-        - Control
-        - HOXA1 Knockdown
-    samples:
-        Control:
-            - SRR493366_quant
-            - SRR493367_quant
-        HOXA1 Knockdown:
-            - SRR493369_quant
-            - SRR493371_quant
-    outdir: human_grouper
-    orphan: True
-    mincut: True
-    """
-    input: expand("outputs/quantification/salmon/{illumina_lib_name}_quant/quant.sf", illumina_lib_name = ILLUMINA_LIB_NAMES)
-    output: conf = "outputs/quantification/grouper/grouper_conf.yml"
-    params: 
-        grouperdir = "outputs/quantification/grouper/",
-        salmondir =  "outputs/quantification/salmon/"
-    run:
-        # create a dictionary of assembly groups: library names
-        tmp = metadata_illumina[["condition", "library_name"]]
-        condition_dict = {}
-        for group, d in tmp.groupby('condition'):
-            condition_dict[group] = d['library_name'].values.tolist()
-        # use the dictionary to parse a string of conditions (assembly groups) that will be written to the grouper yaml
-        conditions_list = "\n    - ".join(list(condition_dict.keys()))
-        # use the dictionary to parse a nested string of conditions: salmon results by library name that will be written to grouper yaml
-        samples_list = []
-        for condition, library_names in condition_dict.items():
-            samples_list.append("\n    - " + condition + ":")
-            for library_name in library_names:
-                samples_list.append("\n        - " + params.salmondir + library_name + "_quant")
-
-        samples_list = "".join(samples_list)
-        # create a config template with format strings that will be substituted in the write process
-        config_template = """\
-conditions:
-    - {conditions_list}
-samples: {samples_list}
-outdir: {outdir}
-orphan: True
-mincut: True
-"""
-        with open(output.conf, 'wt') as fp:
-            fp.write(config_template.format(conditions_list = conditions_list, 
-                                            samples_list = samples_list,
-                                            outdir = params.grouperdir))
-
-
-rule run_grouper:
-    input: "outputs/quantification/grouper/grouper_conf.yml"
-    output: "outputs/quantification/grouper/mag.flat.clust"
-    conda: "envs/biogrouper.yml"
+rule samtools_index:
+    input:"outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam"
+    output:"outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam.bai"
+    conda: "envs/samtools.yml"
     shell:'''
-    Grouper --config {input}
+    samtools index {input}
     '''
 
-rule gunzip_salmon_eq:
-    input: "outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt.gz"
-    output: "outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt"
+rule htseq_count:
+    input:
+        bai="outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam.bai",
+        gff="inputs/genome/evm/Amblyomma_americanum_filtered_assembly.evm.gff3"
+    output: "outputs/counts/htseq_count/{illumina_lib_name}.out"
+    conda: "envs/htseq.yml"
     shell:'''
-    gunzip -c {input} > {output}
+    htseq-count -f bam {input.bam} {input.gff} -i Parent -r pos > {output}
     '''
 
-rule run_corset:
-    input: expand("outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt", illumina_lib_name = ILLUMINA_LIB_NAMES)
-    output: "outputs/quantification/corset/corset-counts.txt"
-    params: outdir = "outputs/quantification/corset/corset"
-    conda: "envs/corset.yml"
+rule combine_htseq_counts:
+    input: expand("outputs/counts/htseq_count/{illumina_lib_name}.out", illumina_lib_name = ILLUMINA_LIB_NAMES)
+    output: "outputs/counts/raw_counts.tsv"
+    conda: "envs/tidyverse.yml"
     shell:'''
-    corset -i salmon_eq_classes {input} -p {params.outdir} -f true
+    Rscript bin/combine_htseq_counts.R {output} {input}
     '''

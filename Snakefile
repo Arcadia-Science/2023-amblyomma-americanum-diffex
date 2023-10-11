@@ -110,7 +110,7 @@ rule split_paired_end_reads_fastp:
 rule star_index_genome:
     input:
         genome = "inputs/genome/Amblyomma_americanum_filtered_assembly.fasta",
-        gff = "inputs/genome/evm/Amblyomma_americanum_filtered_assembly.evm.gff3" 
+        gff = "inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3" 
     output: "inputs/genome/SAindex"
     conda: "envs/star.yml"
     threads: 16
@@ -160,7 +160,7 @@ rule samtools_index:
 rule htseq_count:
     input:
         bai="outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam.bai",
-        gff="inputs/genome/evm/Amblyomma_americanum_filtered_assembly.evm.gff3"
+        gff="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3"
     output: "outputs/counts/htseq_count/{illumina_lib_name}.out"
     conda: "envs/htseq.yml"
     shell:'''

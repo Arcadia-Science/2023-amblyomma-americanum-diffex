@@ -135,13 +135,15 @@ rule star_map_reads:
     shell:'''
     # define a bash variable so the STAR command only needs to be repeated once
     if [ "{params.liblayout}" == "PAIRED" ]; then
-        fastq_files={input.fastq}
+        fastq_files="{input.fastq}"
     elif [ "{params.liblayout}" == "SINGLE" ]; then
-        fastq_files={input.fastq[0]}
+        fastq_files="{input.fastq[0]}"
     fi
+    
+    echo ${{fastq_files}}
 
     STAR --runThreadN {threads} --genomeDir {params.genomedir}  \
-         --readFilesIn ${{fastq_files}} --outFilterType BySJout  \
+         --readFilesIn ${{fastq_files}} --readFilesCommand zcat --outFilterType BySJout  \
          --outFilterMultimapNmax 20 --alignSJoverhangMin 8    \
          --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 \
          --outFilterMismatchNoverLmax 0.6 --alignIntronMin 20 \
@@ -160,12 +162,13 @@ rule samtools_index:
 
 rule htseq_count:
     input:
+        bam="outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam",
         bai="outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam.bai",
         gff="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3"
     output: "outputs/counts/htseq_count/{illumina_lib_name}.out"
     conda: "envs/htseq.yml"
     shell:'''
-    htseq-count -f bam {input.bai} {input.gff} -i Parent -r pos > {output}
+    htseq-count -f bam {input.bam} {input.gff} -i Parent -r pos > {output}
     '''
 
 rule combine_htseq_counts:

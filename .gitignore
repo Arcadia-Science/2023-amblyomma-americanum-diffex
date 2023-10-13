@@ -1,0 +1,7 @@
+.Rhistory
+inputs/annotations
+inputs/genome
+inputs/assembly
+.snakemake
+sandbox/
+outputs/

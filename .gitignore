@@ -5,3 +5,4 @@ inputs/assembly
 .snakemake
 sandbox/
 outputs/
+notebooks/.ipynb_checkpoints/

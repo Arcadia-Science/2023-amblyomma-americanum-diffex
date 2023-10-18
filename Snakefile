@@ -146,7 +146,7 @@ rule star_map_reads:
          --readFilesIn ${{fastq_files}} --readFilesCommand zcat --outFilterType BySJout  \
          --outFilterMultimapNmax 20 --alignSJoverhangMin 8    \
          --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 \
-         --outFilterMismatchNoverLmax 0.6 --alignIntronMin 20 \
+         --outFilterScoreMinOverLread 0.3 --outFilterMatchNminOverLread 0.3 \
          --alignIntronMax 1000000 --alignMatesGapMax 1000000  \
          --outSAMattributes NH HI NM MD --outSAMtype BAM      \
          SortedByCoordinate --outFileNamePrefix {params.outprefix}

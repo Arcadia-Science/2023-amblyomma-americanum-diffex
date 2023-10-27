@@ -145,10 +145,22 @@ rule salmon:
 
 # create a tx2gene file by mapping transcripts back to genome with a splice-aware long read aligner
 
-rule map_transcripts_to_genome_with_ultra:
-
 rule convert_gff_to_gtf:
+    conda: "envs/agat.yml"
+    shell:'''
+    agat_convert_sp_gff2gtf.pl --gff annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3 -o annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf
+    '''
+
+rule map_transcripts_to_genome_with_ultra:
+    conda: "envs/ultra.yml"
+    shell:'''
+    uLTRA pipeline genome/Amblyomma_americanum_filtered_assembly.fasta annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf ../../outputs/annotation/dammit/orthofuser_final_clean.fa ultra_out/ --prefix Amblyomma_americanum_filtered_assembly --t 14 --disable_infer
+    '''
 
 rule assign_transcripts_to_genes_by_overlaps_with_gtf_genes: 
+    conda: "envs/XXX.yml"
+    shell:'''
+    python assign_mapped_transcripts_to_gene_by_gtf_overlap.py annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf ultra_out/Amblyomma_americanum_filtered_assembly.sam Amblyomma_americanum_filtered_assembly.tx2gene_by_gtf.tsv
+    '''
 
 rule make_counts:

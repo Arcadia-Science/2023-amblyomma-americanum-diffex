@@ -6,3 +6,4 @@ inputs/assembly
 sandbox/
 outputs/
 notebooks/.ipynb_checkpoints/
+.DS_Store

@@ -37,7 +37,6 @@ def calculate_overlap(Start, End, Start_gene, End_gene, gene_name):
 # test_row = {'gene_name': 'evm.TU.contig_177737_1.1', 'Start': 0, 'End': 14685, 'Start_gene': 5972, 'End_gene': 27724}
 # print(calculate_overlap(test_row))
 
-
 def main(gtf_file, sam_file, output_file):
     gene_ranges = gtf_to_pyranges(gtf_file)
     transcript_ranges = sam_to_pyranges(sam_file)
@@ -52,7 +51,6 @@ def main(gtf_file, sam_file, output_file):
         overlaps_df['Start_gene'], overlaps_df['End_gene'], 
         overlaps_df['gene_name']
     )
-    #overlaps_df['overlap_length'] = overlaps_df.apply(calculate_overlap, axis=1)
 
     print("Columns in overlaps dataframe:", overlaps_df.columns)
 
@@ -63,8 +61,10 @@ def main(gtf_file, sam_file, output_file):
     with open(output_file, 'w') as out:
         for index, row in overlaps_df.iterrows():
             # If there's no gene overlap, use the transcript name as gene name
-            gene_name = row['gene_name'] if row['gene_name'] != "-1" else row['Name']
-            out.write(f"{row['Name']}\t{gene_name}\n")
+            #gene_name = row['gene_name'] if row['gene_name'] != "-1" else row['Name']
+            #out.write(f"{row['Name']}\t{gene_name}\n")
+            # write only transcripts that overlapped with a gene
+            out.write(f"{row['Name']}\t{row['gene_name']}\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Map transcripts to genes based on overlap.")

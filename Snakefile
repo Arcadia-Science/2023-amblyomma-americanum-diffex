@@ -155,7 +155,7 @@ rule convert_gff_to_gtf:
 
 rule map_transcripts_to_genome_with_ultra:
     input:
-        genome="genome/Amblyomma_americanum_filtered_assembly.fasta",
+        genome="inputs/genome/Amblyomma_americanum_filtered_assembly.fasta",
         gtf="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf",
         txome="inputs/assembly/orthofuser_final_clean.fa.dammit.fasta"
     output: "outputs/tx2gene/ultra/Amblyomma_americanum_filtered_assembly.sam"
@@ -170,12 +170,12 @@ rule map_transcripts_to_genome_with_ultra:
 
 rule assign_transcripts_to_genes_by_overlaps_with_gtf_genes:
     input: 
-        bam="outputs/tx2gene/ultra/Amblyomma_americanum_filtered_assembly.sam",
+        sam="outputs/tx2gene/ultra/Amblyomma_americanum_filtered_assembly.sam",
         gtf="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf"
     output: "outputs/tx2gene/tx2gene.tsv"
     conda: "envs/pysam.yml"
     shell:'''
-    python scripts/assign_mapped_transcripts_to_gene_by_gtf_overlap.py {input.gtf} {inputs.sam} {output}
+    python scripts/assign_mapped_transcripts_to_gene_by_gtf_overlap.py {input.gtf} {input.sam} {output}
     '''
 
 rule make_counts:

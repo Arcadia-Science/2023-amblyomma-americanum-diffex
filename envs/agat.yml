@@ -3,4 +3,4 @@ channels:
    - bioconda
    - defaults
 dependencies:
-   - star=2.7.11a 
+   - agat=1.2.0

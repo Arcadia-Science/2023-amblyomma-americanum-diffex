@@ -49,7 +49,8 @@ ui <- fluidPage(
                              choices = c("sex", "tissue", "blood_meal_hour_range", "study_title")),
                ),
                mainPanel(
-                 plotlyOutput("pca_plot")
+                 plotlyOutput("pca_plot"),
+                 DTOutput("metadata_table")
                )
              )),
     tabPanel("DE Analysis", 
@@ -58,7 +59,7 @@ ui <- fluidPage(
                  # Filtering options (log2FC, p-value, basemean)
                  numericInput("log2FoldChange_filter", "Filter by log2FC", min = -5, max = 5, value = 2),
                  numericInput("padj_filter", "Filter by p-value", min = 0, max = 1, value = 0.05),
-                 numericInput("basemean_filter", "Filter by basemean", min = 0, max = 10000000, value = 100),
+                 numericInput("basemean_filter", "Filter by basemean", min = 0, max = 10000000, value = 20),
                  selectInput("contrast_variable", "Select Contrast", 
                              choices = c("sex_tissue"),
                              multiple = FALSE),
@@ -71,7 +72,7 @@ ui <- fluidPage(
                  actionButton("get_diff_res", "Get Differential Results")
                ),
                mainPanel(
-                 plotlyOutput("ma_plot"),
+                 plotlyOutput("volcano_plot"),
                  DTOutput("gene_table")
                )
              ))
@@ -83,6 +84,8 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
+# overview (PCA plot, metadata table) -------------------------------------
+
   # PCA plot
   output$pca_plot <- renderPlotly({
     selected_variable <- input$color_variable
@@ -91,7 +94,8 @@ server <- function(input, output, session) {
       left_join(metadata)
     percentVar <- round(100 * attr(pcad, "percentVar"))
     
-    pca_plot <- ggplot(pcad, aes(PC1, PC2, color = !!sym(selected_variable), text = library_name)) +
+    pca_plot <- ggplot(pcad, aes(PC1, PC2, color = !!sym(selected_variable), 
+                                 label = library_name)) +
       geom_point(size = 3) +
       labs(x = paste0("PC1: ", percentVar[1], "% variance"),
            y = paste0("PC2: ", percentVar[2], "% variance"),
@@ -102,22 +106,24 @@ server <- function(input, output, session) {
     ggplotly(pca_plot)
   })
   
-  # differential expression results (MA plot, table)
+  output$metadata_table <- renderDT({
+    metadata %>%
+      datatable(options = list(pageLength = 10))
+  })
+  
+  # differential expression results (volcano plot, table) -------------
   observe({
     updateSelectInput(session, "condition1", choices = c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"))
     updateSelectInput(session, "condition2", choices = c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"))
   })
   
-  # Function to convert DESeqResults object to a data frame
+  # extract deseq2 results and return df
   diff_results <- eventReactive(input$get_diff_res, {
     selected_contrasts <- input$contrast_variable
     selected_conditions1 <- input$condition1
     selected_conditions2 <- input$condition2
     
-    # selected_contrasts <- "sex_tissue"
-    # selected_conditions1 <- "female_x_salivary_gland"
-    # selected_conditions2 <- "female_x_whole"
-    # Extract differential expression results based on selected contrasts and conditions
+    # extract differential expression results based on selected contrasts and conditions
     ds_results <- results(ds, contrast = c(selected_contrasts, selected_conditions1, selected_conditions2))
     
     # Convert DESeqResults object to a data frame
@@ -136,18 +142,18 @@ server <- function(input, output, session) {
     ds_results_significant
   })
   
-  # Render the MA plot
-  output$ma_plot <- renderPlotly({
-    ma_plot <- ggplot(diff_results(), aes(x = log2FoldChange, y = -log10(padj), 
+  # volcano plot
+  output$volcano_plot <- renderPlotly({
+    volcano_plot <- ggplot(diff_results(), aes(x = log2FoldChange, y = -log10(padj), 
                                           color = significant, label = gene)) +
       geom_point() +
       labs(x = "log2FC", y = "-log10(padj)") +
       theme_classic()
     
-    ggplotly(ma_plot)
+    ggplotly(volcano_plot)
   })
   
-  # Sample gene table
+  # significant gene table
   output$gene_table <- renderDT({
     ds_results <- diff_results() %>%
       filter(significant == "significant")

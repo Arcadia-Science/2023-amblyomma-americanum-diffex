@@ -73,6 +73,7 @@ ui <- fluidPage(
                ),
                mainPanel(
                  plotlyOutput("volcano_plot"),
+                 plotlyOutput("ma_plot"),
                  DTOutput("gene_table")
                )
              ))
@@ -145,12 +146,23 @@ server <- function(input, output, session) {
   # volcano plot
   output$volcano_plot <- renderPlotly({
     volcano_plot <- ggplot(diff_results(), aes(x = log2FoldChange, y = -log10(padj), 
-                                          color = significant, label = gene)) +
-      geom_point() +
-      labs(x = "log2FC", y = "-log10(padj)") +
+                                               color = significant, label = gene)) +
+      geom_point(alpha = 0.5) +
+      labs(x = "log2(Fold Change)", y = "-log10(Adjusted p Value (BH))") +
       theme_classic()
     
     ggplotly(volcano_plot)
+  })
+  
+  # MA plot
+  output$ma_plot <- renderPlotly({
+    ma_plot <- ggplot(diff_results(), aes(x = log2(baseMean), y = log2FoldChange, 
+                                          color = significant, label = gene)) +
+      geom_point(alpha = 0.5) +
+      labs(x = "log2(Mean Count)", y = "log2(Fold Change)") +
+      theme_classic()
+    
+    ggplotly(ma_plot)
   })
   
   # significant gene table

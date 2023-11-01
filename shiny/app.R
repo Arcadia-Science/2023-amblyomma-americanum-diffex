@@ -40,36 +40,41 @@ vsd <- vst(ds, blind = FALSE)
 
 ui <- fluidPage(
   titlePanel("Differential Expression Explorer"),
-  sidebarLayout(
-    sidebarPanel(
-      # Add filtering options (log2FC, p-value, basemean)
-      numericInput("log2FoldChange_filter", "Filter by log2FC", min = -5, max = 5, value = 2),
-      numericInput("padj_filter", "Filter by p-value", min = 0, max = 1, value = 0.05),
-      numericInput("basemean_filter", "Filter by basemean", min = 0, max = 10000000, value = 100),
-      actionButton("apply_filters", "Apply Filters"),
-      selectInput("contrast_variable", "Select Contrast", 
-                  choices = c("sex_tissue"),
-                  multiple = FALSE),
-      selectInput("condition1", "Condition 1", 
-                  choices =  c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"), 
-                  multiple = FALSE),
-      selectInput("condition2", "Condition 2", 
-                  choices =  c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"), 
-                  multiple = FALSE),
-      actionButton("get_diff_res", "Get Differential Results")
-    ),
-    mainPanel(
-      tabsetPanel(
-        tabPanel("DE Analysis", 
+  tabsetPanel(
+    tabPanel("DE Analysis", 
+             sidebarLayout(
+               sidebarPanel(
+                 # Filtering options (log2FC, p-value, basemean)
+                 numericInput("log2FoldChange_filter", "Filter by log2FC", min = -5, max = 5, value = 2),
+                 numericInput("padj_filter", "Filter by p-value", min = 0, max = 1, value = 0.05),
+                 numericInput("basemean_filter", "Filter by basemean", min = 0, max = 10000000, value = 100),
+                 selectInput("contrast_variable", "Select Contrast", 
+                             choices = c("sex_tissue"),
+                             multiple = FALSE),
+                 selectInput("condition1", "Condition 1", 
+                             choices =  c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"), 
+                             multiple = FALSE),
+                 selectInput("condition2", "Condition 2", 
+                             choices =  c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"), 
+                             multiple = FALSE),
+                 actionButton("get_diff_res", "Get Differential Results")
+               ),
+               mainPanel(
                  plotlyOutput("ma_plot"),
-                 DTOutput("gene_table")),
-        tabPanel("PCA Plot", 
+                 DTOutput("gene_table")
+               )
+             )),
+    tabPanel("PCA Plot", 
+             sidebarLayout(
+               sidebarPanel(
                  # Add a drop-down menu to select the coloring variable
                  selectInput("color_variable", "Select Coloring Variable", 
                              choices = c("sex", "tissue", "blood_meal_hour_range", "study_title")),
-                 plotOutput("pca_plot"))
-      )
-    )
+               ),
+               mainPanel(
+                 plotOutput("pca_plot")
+               )
+             ))
   )
 )
 

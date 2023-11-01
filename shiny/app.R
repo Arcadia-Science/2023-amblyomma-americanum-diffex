@@ -41,6 +41,17 @@ vsd <- vst(ds, blind = FALSE)
 ui <- fluidPage(
   titlePanel("Differential Expression Explorer"),
   tabsetPanel(
+    tabPanel("PCA Plot", 
+             sidebarLayout(
+               sidebarPanel(
+                 # Add a drop-down menu to select the coloring variable
+                 selectInput("color_variable", "Select Coloring Variable", 
+                             choices = c("sex", "tissue", "blood_meal_hour_range", "study_title")),
+               ),
+               mainPanel(
+                 plotlyOutput("pca_plot")
+               )
+             )),
     tabPanel("DE Analysis", 
              sidebarLayout(
                sidebarPanel(
@@ -62,17 +73,6 @@ ui <- fluidPage(
                mainPanel(
                  plotlyOutput("ma_plot"),
                  DTOutput("gene_table")
-               )
-             )),
-    tabPanel("PCA Plot", 
-             sidebarLayout(
-               sidebarPanel(
-                 # Add a drop-down menu to select the coloring variable
-                 selectInput("color_variable", "Select Coloring Variable", 
-                             choices = c("sex", "tissue", "blood_meal_hour_range", "study_title")),
-               ),
-               mainPanel(
-                 plotOutput("pca_plot")
                )
              ))
   )
@@ -98,15 +98,6 @@ server <- function(input, output, session) {
            color = input$color_variable) +
       coord_fixed() +
       theme_classic()
-    
-    # pca_plot <- ggplotly(pca_plot, tooltip = "text") # Add tooltip for hover
-    
-    # observeEvent(event_data("plotly_hover"), {
-    #   hover_data <- event_data("plotly_hover")
-    #   # You can access hover_data to get information about the point hovered over
-    #   # Here you can add code to display the gene name or other information
-    #   # based on hover_data
-    # })
     
     ggplotly(pca_plot)
   })

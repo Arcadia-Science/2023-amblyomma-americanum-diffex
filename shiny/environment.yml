@@ -1,0 +1,14 @@
+channels:
+   - conda-forge
+   - bioconda
+   - defaults
+dependencies:
+   - r-shiny=1.7.5
+   - r-shinydashboard=0.7.2
+   - r-shinythemes=1.2.0
+   - r-dt=0.28
+   - r-tidyverse=2.0.0
+   - r-heatmaply=1.5.0
+   - r-plotly=4.10.3
+   - r-markdown=1.11
+   - bioconductor-deseq2=1.40.2

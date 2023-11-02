@@ -102,14 +102,32 @@ ui <- fluidPage(
              sidebarLayout(
                sidebarPanel(
                  selectizeInput("selected_gene", "Enter Gene Name:", 
-                             #choices = rownames(vsda), multiple = FALSE),
-                             choices = NULL, multiple = FALSE, options = NULL),
+                                choices = NULL, multiple = FALSE, options = NULL),
                  actionButton("plot_gene", "Plot Gene")
                ),
                mainPanel(
                  plotlyOutput("gene_boxplot")
                )
              )),
+    tabPanel("Expression by Condition",
+             sidebarLayout(
+               sidebarPanel(
+                 helpText(
+                   "This tab reports on expression per sample.",
+                   "It uses counts that have been normalized for sequencing depth and undergone variance stabilizing transformation (VST).",
+                   "VST outputs transformed data on the log2 scale.",
+                   "With this method, negative values indicate a count of less than 1, e.g. that the gene is not detected in the given sample."
+                 ),
+                 selectInput("condition_input", "Select Condition:",
+                             choices = unique(metadata$sex_tissue)),
+                 numericInput("expression_threshold", "Expression Threshold:", value = 0, min = -5),
+                 actionButton("view_expression", "View Expression")
+               ),
+               mainPanel(
+                 tableOutput("expression_table"),
+                 plotlyOutput("expression_plot")
+               )
+             ))
   )
 )
 
@@ -292,6 +310,38 @@ server <- function(input, output, session) {
       ggplotly(gene_boxplot)
     }
   })
+  
+  # expression by condition -------------------------------------------------
+  expression_data <- reactive({
+    req(input$view_expression)  # Ensure the button is clicked
+    req(input$condition_input)  # Ensure a contrast is selected
+    # Filter the expression data for the selected contrast
+    # Assuming vsda holds the expression data where rows are genes and columns are samples
+    selected_samples <- metadata %>% filter(sex_tissue == input$condition_input) %>% pull(library_name)
+    condition_expression <- vsda[, selected_samples]
+    expression_df <- condition_expression %>%
+      as.data.frame() %>%
+      rownames_to_column("gene") %>%
+      pivot_longer(cols = -gene, names_to = "library_name", values_to = "vst")
+    expression_df
+  })
+  
+  output$expression_table <- renderTable({
+    expression_data() %>%
+      filter(vst >= input$expression_threshold)
+  })
+  
+  output$expression_plot <- renderPlotly({
+    expression_df <- expression_data()
+    expression_plt <- ggplot(expression_df, aes(x = library_name, y = vst)) +
+      geom_jitter() +
+      labs(x = "Sample", y = "Normalized Counts (VST)") +
+      theme_classic() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    expression_plt
+    ggplotly(expression_plt)
+  })
+  
 }
 
 

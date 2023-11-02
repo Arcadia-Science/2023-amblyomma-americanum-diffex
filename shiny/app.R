@@ -10,7 +10,7 @@ library(DT)
 dds <- readRDS("input_data/dds_sex_tissue.RDS")
 ds <- readRDS("input_data/ds_sex_tissue.RDS")
 metadata <- read_tsv("input_data/metadata.tsv")
-annotation <- read_tsv("input_data/Amblyomma-americanum_combined.tsv")
+annotations <- read_tsv("input_data/Amblyomma-americanum_combined.tsv")
 
 # process input data ------------------------------------------------------
 
@@ -28,10 +28,15 @@ metadata <- metadata %>%
   mutate(sex_tissue = paste0(sex, "_x_", tissue))
 
 # process annotation information so it matches the default EVM annot names 
-annotations <- annotation %>%
+annotations <- annotations %>%
   mutate(gene = gsub("Amblyomma-americanum_", "", gene_name), .before = gene_name,
          gene = gsub("-", "_", gene),
-         gene = gsub(".model", ".TU", gene)) 
+         gene = gsub(".model", ".TU", gene)) %>%
+  # define a consensus annotation. Use eggnog first, then kegg if eggnog is blank, then deepsig, or nothing
+  mutate(consensus_annotation = ifelse(!is.na(egg_Description), egg_Description,
+                                       ifelse(!is.na(KO_definition), KO_definition, 
+                                              ifelse(!is.na(deepsig_feature), deepsig_feature, "unknown function")))) %>%
+  mutate(combined_gene = paste0(gene_name, "; ", consensus_annotation))
 
 # perform variance stabilize transformation for PCA and some other plots
 vsd <- vst(ds, blind = FALSE)
@@ -198,7 +203,8 @@ server <- function(input, output, session) {
     }
     
     volcano_plot <- ggplot(diff_results_df, aes(x = log2FoldChange, y = -log10(padj), 
-                                                color = color_var, label = gene)) +
+                                                color = color_var, 
+                                                label = combined_gene)) +
       geom_point(alpha = 0.5) +
       labs(x = "log2(Fold Change)", y = "-log10(Adjusted p Value (BH))") +
       theme_classic()
@@ -216,7 +222,7 @@ server <- function(input, output, session) {
     }
     
     ma_plot <- ggplot(diff_results_df, aes(x = log2(baseMean), y = log2FoldChange, 
-                                          color = color_var, label = gene)) +
+                                          color = color_var, label = combined_gene)) +
       geom_point(alpha = 0.5) +
       labs(x = "log2(Mean Count)", y = "log2(Fold Change)") +
       theme_classic()

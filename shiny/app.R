@@ -35,6 +35,8 @@ annotations <- annotation %>%
 
 # perform variance stabilize transformation for PCA and some other plots
 vsd <- vst(ds, blind = FALSE)
+vsda <- assay(vsd)
+colnames(vsda) <- vsd$library_name
 
 # ui logic ----------------------------------------------------------------
 
@@ -69,12 +71,25 @@ ui <- fluidPage(
                  selectInput("condition2", "Condition 2", 
                              choices =  c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"), 
                              multiple = FALSE),
-                 actionButton("get_diff_res", "Get Differential Results")
+                 actionButton("get_diff_res", "Get Differential Results"),
+                 downloadButton('download_data', 'Download Filtered Results')
                ),
                mainPanel(
                  plotlyOutput("volcano_plot"),
                  plotlyOutput("ma_plot"),
                  DTOutput("gene_table")
+               )
+             )),
+    tabPanel("Gene",
+             sidebarLayout(
+               sidebarPanel(
+                 selectizeInput("selected_gene", "Enter Gene Name:", 
+                             #choices = rownames(vsda), multiple = FALSE),
+                             choices = NULL, multiple = FALSE, options = NULL),
+                 actionButton("plot_gene", "Plot Gene")
+               ),
+               mainPanel(
+                 plotlyOutput("gene_boxplot")
                )
              ))
   )
@@ -172,6 +187,60 @@ server <- function(input, output, session) {
     
     ds_results %>%
       datatable(options = list(pageLength = 10))
+  })
+  
+  output$download_data <- downloadHandler(
+    filename = function() {
+      paste0('filtered_results',
+             '_log2FC', input$log2FoldChange_filter,
+             '_basemean', input$basemean_filter,
+             '_padj', input$padj_filter,
+             '_', input$condition1,
+             '_', input$condition2,
+             '.tsv')
+    },
+    content = function(file) {
+      ds_results <- diff_results() %>%
+        filter(significant == "significant")
+      write_tsv(ds_results, file)
+    }
+  )
+  
+  # gene-specific visualization ------------------------------------------
+  # update the choices for selected_gene -- using server-side selectize speeds up gene selection 
+  # bc we have 30k genes to choose from
+  observe({
+    gene_choices <- rownames(vsda)
+    updateSelectizeInput(session, "selected_gene", choices = gene_choices, server = TRUE)
+  })
+
+  observe({
+    if (!is.null(input$selected_gene)) {
+      gene_conditions <- colnames(vsd)
+      updateSelectInput(session, "gene_condition", choices = gene_conditions, selected = gene_conditions)
+    } else {
+      updateSelectInput(session, "gene_condition", choices = NULL, selected = NULL)
+    }
+  })
+
+  # plot gene count boxplot
+  output$gene_boxplot <- renderPlotly({
+    selected_gene <- input$selected_gene
+    
+    if (!is.null(selected_gene)) {
+      gene_data <- data.frame(gene_count = vsda[selected_gene, ]) %>%
+        rownames_to_column("library_name") %>%
+        left_join(metadata, by = "library_name")
+
+      gene_boxplot <- ggplot(gene_data, aes(x = sex_tissue, y = gene_count)) +
+        geom_boxplot(outlier.shape = NA) +
+        geom_jitter(alpha = 0.5, aes(label = library_name)) +
+        labs(x = "Condition", y = "Normalized Count") +
+        theme_classic() +
+        theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 1))
+
+      ggplotly(gene_boxplot)
+    }
   })
 }
 

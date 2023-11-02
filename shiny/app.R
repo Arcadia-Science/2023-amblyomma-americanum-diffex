@@ -71,15 +71,12 @@ ui <- fluidPage(
                  selectInput("condition2", "Condition 2", 
                              choices =  c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"), 
                              multiple = FALSE),
-                 actionButton("get_diff_res", "Get Differential Results"),
-                 downloadButton('download_data', 'Download Filtered Results'),
                  helpText(
-                   "In this tab, you can upload a CSV file with your own information.",
+                   "Optional: upload a CSV file with your own information.",
                    "A join will be executed on the 'gene_name' column, so please ensure your file has a column named 'gene_name' with gene identifiers formatted as follows: ",
                    "'Amblyomma-americanum_evm.model.contig-XXXXX-X.X' (for example, Amblyomma-americanum_evm.model.contig-91628-1.2)",
-                   "Once the file is uploaded and processed, you can select a column from your file to color the points in the output plot.",
-                   "The output plot is a volcano plot with log2(Fold Change) on the x-axis and -log10(Adjusted p Value (BH)) on the y-axis,",
-                   "where each point represents a gene. The coloring of points is based on the column you select."
+                   "Once the file is uploaded, you can select a column from your file to color the points in the output plot.",
+                   "If you do not upload a file, points will be colored by significance of differential expression results, inferrered from the filtering criteria specified above."
                  ),
                  fileInput("file", "Choose CSV File", 
                            accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")),
@@ -87,7 +84,8 @@ ui <- fluidPage(
                               choices = c("Significance" = "significance", "Uploaded Variable" = "uploaded"),
                               selected = "significance"),
                  uiOutput("select_column_ui"), # This will show up only if a file is uploaded
-                 actionButton("redraw_plots", "Re-draw Plots with New Color"),
+                 actionButton("get_diff_res", "Get Differential Results"),
+                 downloadButton('download_data', 'Download Filtered Results')
                ),
                mainPanel(
                  plotlyOutput("volcano_plot"),
@@ -143,33 +141,44 @@ server <- function(input, output, session) {
   })
   
   # differential expression results (volcano plot, table) -------------
-  redraw_trigger <- reactiveVal(0)
-  
-  observeEvent(input$redraw_plots, {
-    redraw_trigger(redraw_trigger() + 1)
-  })
-  
   observe({
     updateSelectInput(session, "condition1", choices = c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"))
     updateSelectInput(session, "condition2", choices = c("female_x_salivary_gland", "male_x_whole", "female_x_whole", "female_x_midgut"))
   })
   
-  # extract deseq2 results and return df
+  # Process the user-provided uploaded file
+  uploaded_data <- reactive({
+    req(input$file)
+    read_csv(input$file$datapath)
+  })
+  
+  # Dynamic UI for selecting a column from the uploaded data
+  output$select_column_ui <- renderUI({
+    req(input$file)  # Only show if a file is uploaded
+    selectInput("color_column", "Select Column to Color By", choices = names(uploaded_data()))
+  })
+  
+  # Extract deseq2 results and return df
   diff_results <- eventReactive(input$get_diff_res, {
     selected_contrasts <- input$contrast_variable
     selected_conditions1 <- input$condition1
     selected_conditions2 <- input$condition2
     
-    # extract differential expression results based on selected contrasts and conditions
+    # Extract differential expression results based on selected contrasts and conditions
     ds_results <- results(ds, contrast = c(selected_contrasts, selected_conditions1, selected_conditions2))
-    
-    # Convert DESeqResults object to a data frame
     ds_results_df <- ds_results %>%
       as.data.frame() %>%
       rownames_to_column("gene") %>%
       left_join(annotations)
-
-    # demarcate significant
+    
+    # If a file is uploaded and "Uploaded Variable" is selected for coloring
+    if (!is.null(input$file) && input$color_by == "uploaded") {
+      req(input$color_column)
+      uploaded_data <- read_csv(input$file$datapath)
+      ds_results_df <- left_join(ds_results_df, uploaded_data(), by = "gene_name")
+    }
+    
+    # Demarcate significant
     ds_results_significant <- ds_results_df %>%
       mutate(significant = ifelse(abs(log2FoldChange) >= input$log2FoldChange_filter & 
                                   padj <= input$padj_filter & 
@@ -178,46 +187,17 @@ server <- function(input, output, session) {
     # Return the filtered data frame
     ds_results_significant
   })
-
-  # process the user-provided uploaded file
-  uploaded_data <- reactive({
-    req(input$file)
-    read_csv(input$file$datapath)
-  })
-
-  # dynamic UI for selecting a column from the uploaded data
-  output$select_column_ui <- renderUI({
-    req(input$file)  # Only show if a file is uploaded
-    selectInput("color_column", "Select Column to Color By", choices = names(uploaded_data()))
-  })
-  
-  # Combine the diff_results() data with the uploaded_data()
-  combined_data <- reactive({
-    req(input$color_by)  # Ensure a color_by selection is made
-    diff_results_df <- diff_results()
-    if (input$color_by == "uploaded") {
-      req(input$color_column)  # Ensure a color column is selected
-      req(uploaded_data())  # Ensure a file is uploaded
-      # Join the uploaded data with the differential expression results data
-      joined_data <- left_join(diff_results_df, uploaded_data(), by = "gene_name")
-      joined_data
-    } else {
-      # If not coloring by uploaded data, use the original data
-      diff_results_df
-    }
-  })
   
   # volcano plot
   output$volcano_plot <- renderPlotly({
-    redraw_trigger()  # This line will cause this function to re-run each time the button is clicked    
-    combined_df <- combined_data()  # Get the combined data
+    diff_results_df <- diff_results()  # Get the combined data
     color_var <- if(input$color_by == "significance") {
-      combined_df$significant
+      diff_results_df$significant
     } else {
-      combined_df[[input$color_column]]
+      diff_results_df[[input$color_column]]
     }
     
-    volcano_plot <- ggplot(combined_df, aes(x = log2FoldChange, y = -log10(padj), 
+    volcano_plot <- ggplot(diff_results_df, aes(x = log2FoldChange, y = -log10(padj), 
                                                 color = color_var, label = gene)) +
       geom_point(alpha = 0.5) +
       labs(x = "log2(Fold Change)", y = "-log10(Adjusted p Value (BH))") +
@@ -228,15 +208,14 @@ server <- function(input, output, session) {
   
   # MA plot
   output$ma_plot <- renderPlotly({
-    redraw_trigger()  # This line will cause this function to re-run each time the button is clicked
-    combined_df <- combined_data()  # Get the combined data
+    diff_results_df <- diff_results()  # Get the combined data
     color_var <- if(input$color_by == "significance") {
-      combined_df$significant
+      diff_results_df$significant
     } else {
-      combined_df[[input$color_column]]
+      diff_results_df[[input$color_column]]
     }
     
-    ma_plot <- ggplot(combined_df, aes(x = log2(baseMean), y = log2FoldChange, 
+    ma_plot <- ggplot(diff_results_df, aes(x = log2(baseMean), y = log2FoldChange, 
                                           color = color_var, label = gene)) +
       geom_point(alpha = 0.5) +
       labs(x = "log2(Mean Count)", y = "log2(Fold Change)") +
@@ -247,15 +226,6 @@ server <- function(input, output, session) {
   
   # significant gene table
   output$gene_table <- renderDT({
-    # diff_results_df <- diff_results()
-    # # determine what to color by (default significance, otherwise user-uploaded column)
-    # color_var <- if(input$color_by == "significance") {
-    #   data$significant
-    # } else {
-    #   req(uploaded_data())
-    #   joined_data <- left_join(data, uploaded_data(), by = "gene_name")
-    #   joined_data[[input$color_column]]
-    # }
     ds_results <- diff_results() %>%
       filter(significant == "significant")
     

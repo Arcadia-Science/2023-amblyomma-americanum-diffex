@@ -14,7 +14,7 @@ RUN_ACCESSIONS = metadata_all["run_accession"].unique().tolist()
 ILLUMINA_LIB_NAMES = metadata_illumina["library_name"].unique().tolist()
 
 rule all:
-    input: "outputs/counts/raw_counts.tsv"
+    input: "outputs/tx2gene/tx2gene.tsv"
 
 ######################################
 # Download short & long read data
@@ -104,77 +104,78 @@ rule split_paired_end_reads_fastp:
 ## Read quantification
 ##############################################
 
-# using EVM genome annotation.
+# using EVM genome & genome annotation.
 # for now, downloaded by hand from S3 until available on zenodo.
+# documented for myself in a README on AWS in the inputs folder.
 
-rule star_index_genome:
-    input:
-        genome = "inputs/genome/Amblyomma_americanum_filtered_assembly.fasta",
-        gff = "inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3" 
-    output: "inputs/genome/SAindex"
-    params: genomedir = "inputs/genome"
-    conda: "envs/star.yml"
-    threads: 16
+# rule download_transcriptome:
+# will add when there's a public download link
+
+rule index_transcriptome:
+    input: "inputs/assembly/orthofuser_final_clean.fa.dammit.fasta"
+    output: "outputs/quantification/salmon_index/info.json"
+    threads: 1
+    params: indexdir = "outputs/quantification/salmon_index/"
+    conda: "envs/salmon.yml"
     shell:'''
-    STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir {params.genomedir}  \
-         --genomeFastaFiles {input.genome} --sjdbGTFfile {input.gff} \
-         --sjdbGTFtagExonParentTranscript mRNA --sjdbOverhang  99
+    salmon index -t {input} -i {params.indexdir} -k 31
     '''
 
-rule star_map_reads:
+rule salmon:
     input:
-        genome_index = "inputs/genome/SAindex",
-        fastq = expand("outputs/read_qc/fastp_separated_reads/{{illumina_lib_name}}_R{pair}.fq.gz", pair = [1, 2])
-    output: "outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam"
+        index = "outputs/quantification/salmon_index/info.json",
+        r1="outputs/read_qc/fastp_separated_reads/{illumina_lib_name}_R1.fq.gz",
+        r2="outputs/read_qc/fastp_separated_reads/{illumina_lib_name}_R2.fq.gz"
+    output: 
+        "outputs/quantification/salmon/{illumina_lib_name}_quant/quant.sf",
+        "outputs/quantification/salmon/{illumina_lib_name}_quant/aux_info/eq_classes.txt.gz"
     params: 
-        genomedir = "inputs/genome/",
-        outprefix = lambda wildcards: "outputs/counts/star/" + wildcards.illumina_lib_name + "_",
-        liblayout = lambda wildcards: metadata_illumina.loc[wildcards.illumina_lib_name, "library_layout"]
-    threads: 4
-    conda: "envs/star.yml"
+        liblayout = lambda wildcards: metadata_illumina.loc[wildcards.illumina_lib_name, "library_layout"],
+        indexdir = "outputs/quantification/salmon_index/",
+        outdir = lambda wildcards: "outputs/quantification/salmon/" + wildcards.illumina_lib_name + "_quant" 
+    conda: "envs/salmon.yml"
+    threads: 2
     shell:'''
-    # define a bash variable so the STAR command only needs to be repeated once
     if [ "{params.liblayout}" == "PAIRED" ]; then
-        fastq_files="{input.fastq}"
+        salmon quant -i {params.indexdir} -l A -1 {input.r1} -2 {input.r2} -o {params.outdir} --dumpEq --writeOrphanLinks -p {threads} 
     elif [ "{params.liblayout}" == "SINGLE" ]; then
-        fastq_files="{input.fastq[0]}"
+        salmon quant -i {params.indexdir} -l A -r {input.r1} -o {params.outdir} --dumpEq --writeOrphanLinks -p {threads}
     fi
-    
-    echo ${{fastq_files}}
-
-    STAR --runThreadN {threads} --genomeDir {params.genomedir}  \
-         --readFilesIn ${{fastq_files}} --readFilesCommand zcat --outFilterType BySJout  \
-         --outFilterMultimapNmax 20 --alignSJoverhangMin 8    \
-         --alignSJDBoverhangMin 1 --outFilterMismatchNmax 999 \
-         --outFilterMismatchNoverLmax 0.6 --alignIntronMin 20 \
-         --alignIntronMax 1000000 --alignMatesGapMax 1000000  \
-         --outSAMattributes NH HI NM MD --outSAMtype BAM      \
-         SortedByCoordinate --outFileNamePrefix {params.outprefix}
     '''
 
-rule samtools_index:
-    input:"outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam"
-    output:"outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam.bai"
-    conda: "envs/samtools.yml"
+# create a tx2gene file by mapping transcripts back to genome with a splice-aware long read aligner
+
+rule convert_gff_to_gtf:
+    input: "inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3"
+    output: "inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf"
+    conda: "envs/agat.yml"
     shell:'''
-    samtools index {input}
+    agat_convert_sp_gff2gtf.pl --gff {input} -o {output}
     '''
 
-rule htseq_count:
+rule map_transcripts_to_genome_with_ultra:
     input:
-        bam="outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam",
-        bai="outputs/counts/star/{illumina_lib_name}_Aligned.sortedByCoord.out.bam.bai",
-        gff="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3"
-    output: "outputs/counts/htseq_count/{illumina_lib_name}.out"
-    conda: "envs/htseq.yml"
+        genome="inputs/genome/Amblyomma_americanum_filtered_assembly.fasta",
+        gtf="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf",
+        txome="inputs/assembly/orthofuser_final_clean.fa.dammit.fasta"
+    output: "outputs/tx2gene/ultra/Amblyomma_americanum_filtered_assembly.sam"
+    params: 
+        outdir = "outputs/tx2gene/ultra/",
+        prefix = "Amblyomma_americanum_filtered_assembly"
+    threads: 14
+    conda: "envs/ultra.yml"
     shell:'''
-    htseq-count -f bam {input.bam} {input.gff} -i Parent -r pos > {output}
+    uLTRA pipeline {input.genome} {input.gtf} {input.txome} {params.outdir} --prefix {params.prefix} --t 14 --disable_infer
     '''
 
-rule combine_htseq_counts:
-    input: expand("outputs/counts/htseq_count/{illumina_lib_name}.out", illumina_lib_name = ILLUMINA_LIB_NAMES)
-    output: "outputs/counts/raw_counts.tsv"
-    conda: "envs/tidyverse.yml"
+rule assign_transcripts_to_genes_by_overlaps_with_gtf_genes:
+    input: 
+        sam="outputs/tx2gene/ultra/Amblyomma_americanum_filtered_assembly.sam",
+        gtf="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf"
+    output: "outputs/tx2gene/tx2gene.tsv"
+    conda: "envs/pysam.yml"
     shell:'''
-    Rscript bin/combine_htseq_counts.R {output} {input}
+    python scripts/assign_mapped_transcripts_to_gene_by_gtf_overlap.py {input.gtf} {input.sam} {output}
     '''
+
+rule make_counts:

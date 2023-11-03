@@ -113,19 +113,32 @@ ui <- fluidPage(
              sidebarLayout(
                sidebarPanel(
                  helpText(
-                   "This tab reports on expression per sample.",
+                   "This tab reports on expression per condition.",
                    "It uses counts that have been normalized for sequencing depth and undergone variance stabilizing transformation (VST).",
                    "VST outputs transformed data on the log2 scale.",
-                   "With this method, negative values indicate a count of less than 1, e.g. that the gene is not detected in the given sample."
+                   "With this method, negative values indicate a count of less than 1, e.g. that the gene is not detected in the given sample.",
+                   "Using this information, we calculate genes that are never expressed in samples in that condition,",
+                   "that are sometimes expressed in samples in that conditions, or that are always expressed.",
+                   "For genes that are always expressed (e.g. expressed in all samples), you can further by the percentile of the genes expression.",
+                   "You can use the minimum count/percentile (the lowest count observed in all samples in the group) or the mean count/percentile."
                  ),
-                 selectInput("condition_input", "Select Condition:",
-                             choices = unique(metadata$sex_tissue)),
-                 numericInput("expression_threshold", "Expression Threshold:", value = 0, min = -5),
-                 actionButton("view_expression", "View Expression")
+                 selectInput("condition_input", "Select Condition:", choices = unique(metadata$sex_tissue)),
+                 radioButtons("expression_metric", "Expression Metric:", choices = c("Minimum" = "min", "Mean" = "mean")),
+                 sliderInput("expression_percentile", "Expression Percentile:", min = 0, max = 100, value = 50),
+                 numericInput("expression_threshold", "Expression Threshold:", value = 0, min = -6),
+                 actionButton("view_expression", "View Expression"),
+                 downloadButton('download_never', 'Download Never Expressed Table'),
+                 downloadButton('download_sometimes', 'Download Sometimes Expressed Table'),
+                 downloadButton('download_always', 'Download Always Expressed Table')
                ),
                mainPanel(
-                 tableOutput("expression_table"),
-                 plotlyOutput("expression_plot")
+                 plotOutput("expression_plot"),
+                 HTML("<h3>Never Expressed Genes</h3>"),
+                 DTOutput("never_expression_table"),
+                 HTML("<h3>Sometimes Expressed Genes</h3>"),
+                 DTOutput("sometimes_expression_table"),
+                 HTML("<h3>Always Expressed Genes</h3>"),
+                 DTOutput("always_expression_table")
                )
              ))
   )
@@ -319,29 +332,134 @@ server <- function(input, output, session) {
     # Assuming vsda holds the expression data where rows are genes and columns are samples
     selected_samples <- metadata %>% filter(sex_tissue == input$condition_input) %>% pull(library_name)
     condition_expression <- vsda[, selected_samples]
+    # format per-sample expression data as a long data frame
     expression_df <- condition_expression %>%
       as.data.frame() %>%
       rownames_to_column("gene") %>%
       pivot_longer(cols = -gene, names_to = "library_name", values_to = "vst")
-    expression_df
+    
+    # create a df of genes that are never expressed in the input condition
+    not_expressed_df <- expression_df %>%
+      group_by(gene) %>%
+      summarize(max_vst = max(vst)) %>%
+      filter(max_vst < 0)
+    
+    # create a df of genes that are sometimes expressed in the input condition
+    sometimes_expressed_df <- expression_df %>%
+      group_by(gene) %>%
+      summarize(max_vst = max(vst),
+                min_vst = min(vst)) %>%
+      mutate(sometimes_expression = ifelse(max_vst > 0 & min_vst < 0, "sometimes", "other")) %>%
+      filter(sometimes_expression == "sometimes") %>%
+      select(-sometimes_expression)
+    
+    # create a df of genes that are always expressed and define magnitude of expression via percentiles
+    expressed_df <- expression_df %>%
+      filter(!gene %in% not_expressed_df$gene) %>%
+      filter(!gene %in% sometimes_expressed_df$gene)
+    
+    # calculate percentile of expression for genes that are always expressed
+    expressed_df_percentiles <- quantile(x = expressed_df$vst, probs = seq(0, 1, by = 0.01))
+    
+    # define a function for finding the percentile in a group
+    find_percentile <- function(value, percentiles) {
+      sum(value >= percentiles)
+    }
+    
+    # calculate the minimum and mean expression for each gene across samples
+    expressed_df_summary <- expressed_df %>%
+      group_by(gene) %>%
+      summarize(mean_vst = mean(vst),
+                min_vst = min(vst)) %>%
+      rowwise() %>%
+      mutate(min_percentile = find_percentile(min_vst, expressed_df_percentiles) - 1,
+             mean_percentile = find_percentile(mean_vst, expressed_df_percentiles) - 1)
+    
+    # join the summarized count info with the long-format df
+    always_expressed_df <- left_join(expressed_df, expressed_df_summary)
+    
+    # determine the expression metric and percentile to use for filtering
+    expressed_df_summary$expression_metric <- if(input$expression_metric == "min"){
+      expressed_df_summary$min_percentile
+    } else {
+      expressed_df_summary$mean_percentile
+    }
+    
+    expression_percentile <- input$expression_percentile
+    
+    # filter the always expressed genes by the chosen percentile
+    always_expressed_filtered <- expressed_df_summary %>%
+      filter(expression_metric >= expression_percentile)
+    
+    return(list(always_expressed_df = always_expressed_df,
+                always_expressed_filtered = always_expressed_filtered,
+                not_expressed_df = not_expressed_df,
+                sometimes_expressed_df = sometimes_expressed_df))
+  })
+
+  # plot the distribution of expression values for genes that are always expressed
+  output$expression_plot <- renderPlot({
+    expression_list <- expression_data()
+    if(input$expression_metric == "min"){
+      expression_plt <- ggplot(expression_list$always_expressed_df, 
+                               aes(x = vst, 
+                                   fill = ifelse(min_percentile > 50, TRUE, FALSE)))
+    } else {
+      expression_plt <- ggplot(expression_list$always_expressed_df, 
+                               aes(x = vst, 
+                                   fill = ifelse(mean_percentile > 50, TRUE, FALSE))) }
+    expression_plt + 
+      geom_histogram(binwidth = 0.1) +
+      labs(title = "Distribution of Normalized Count Values",
+           x = "Normalized Counts (VST)",
+           y = "Frequency",
+           fill = "Greater than input percentile") +
+      theme_classic()
   })
   
-  output$expression_table <- renderTable({
-    expression_data() %>%
-      filter(vst >= input$expression_threshold)
+  output$never_expression_table <- renderDT({
+    expression_data()$not_expressed_df%>%
+      datatable(options = list(pageLength = 10))
   })
   
-  output$expression_plot <- renderPlotly({
-    expression_df <- expression_data()
-    expression_plt <- ggplot(expression_df, aes(x = library_name, y = vst)) +
-      geom_jitter() +
-      labs(x = "Sample", y = "Normalized Counts (VST)") +
-      theme_classic() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
-    expression_plt
-    ggplotly(expression_plt)
+  output$sometimes_expression_table <- renderDT({
+    expression_data()$sometimes_expressed_df %>%
+      datatable(options = list(pageLength = 10))
+  })
+
+  output$always_expression_table <- renderDT({
+    expression_data()$always_expressed_filtered %>%
+      select(-expression_metric) %>% # rm internal col used for filtering
+      datatable(options = list(pageLength = 10))
   })
   
+  # include download handlers for tables
+  output$download_never <- downloadHandler(
+    filename = function() {
+      paste0('never_expressed_', input$condition_input, '.csv')
+    },
+    content = function(file) {
+      write_csv(expression_data()$not_expressed_df, file)
+    }
+  )
+  
+  output$download_sometimes <- downloadHandler(
+    filename = function() {
+      paste0('sometimes_expressed_', input$condition_input, '.csv')
+    },
+    content = function(file) {
+      write_csv(expression_data()$sometimes_expressed_df, file)
+    }
+  )
+  
+  output$download_always <- downloadHandler(
+    filename = function() {
+      paste0('always_expressed_', input$condition_input, '.csv')
+    },
+    content = function(file) {
+      write_csv(expression_data()$expressed_df, file)
+    }
+  )
 }
 
 

@@ -25,109 +25,132 @@ annotations <- annotations %>%
 # ui logic ----------------------------------------------------------------
 
 ui <- fluidPage(
-  titlePanel("Differential Expression Explorer"),
-  sidebarLayout(
-    sidebarPanel(
-      # Add a dropdown menu for selecting the model
+  # custom header so model selection is reactive & at the top of the app
+  tags$header(
+    tags$div(
+      class = "header",
+      tags$h1("Differential Expression Explorer for", tags$i("Amblyomma americanum")),
+      tags$p("This interactive tool allows you to explore differential expression results for two differential expression models.",
+             "Use the dropdown menu to select a model, and navigate through the tabs to view different visualizations and analyses.",
+             "Because this analysis is built from publicly available data, we had to get creative with our experimental design.",
+             "We built two models for differential expression that compare different subsets of samples.",
+             "The first model, 'sex_tissue,' combines the RNA-seq sample's sex and tissue of origin and compares these values.",
+             "This model takes advantage of all 20 publicly available samples which did not have strong batch effects.",
+             "The second model, 'sex_tissue_blood_meal_hour,' further incorporates the time in the blood meal in the comparison.",
+             "We only had enough replicates to include 12 samples in this model."),
       selectInput("selected_model", "Select Model",
-                  choices = c("sex_tissue", "sex_tissue_blood_meal_hour")),
-    ),
-    mainPanel(
-      tabsetPanel(
-        tabPanel("PCA Plot", 
-                 sidebarLayout(
-                   sidebarPanel(
-                     # Add a drop-down menu to select the coloring variable
-                     selectInput("color_variable", "Select Coloring Variable", 
-                                 choices = c("sex", "tissue", "blood_meal_hour_range", "study_title")),
+                  choices = c("sex_tissue", "sex_tissue_blood_meal_hour"))
+    )
+  ),
+  
+  # CSS to style the header
+  tags$style(
+    HTML(
+      ".header {
+        background-color: #333;
+        color: white;
+        padding: 20px;
+        text-align: left;
+      }"
+    )
+  ),
+  
+  mainPanel(
+    tabsetPanel(
+      tabPanel("PCA Plot", 
+               sidebarLayout(
+                 sidebarPanel(
+                   # Add a drop-down menu to select the coloring variable
+                   selectInput("color_variable", "Select Coloring Variable", 
+                               choices = c("sex", "tissue", "blood_meal_hour_range", "study_title")),
+                 ),
+                 mainPanel(
+                   plotlyOutput("pca_plot"),
+                   DTOutput("metadata_table")
+                 )
+               )),
+      tabPanel("DE Analysis", 
+               sidebarLayout(
+                 sidebarPanel(
+                   # Filtering options (log2FC, p-value, basemean)
+                   numericInput("log2FoldChange_filter", "Filter by log2FC", min = -5, max = 5, value = 2),
+                   numericInput("padj_filter", "Filter by p-value", min = 0, max = 1, value = 0.05),
+                   numericInput("basemean_filter", "Filter by basemean", min = 0, max = 10000000, value = 20),
+                   selectInput("condition1", "Condition 1", choices =  NULL, multiple = FALSE),
+                   selectInput("condition2", "Condition 2", choices =  NULL, multiple = FALSE),
+                   helpText(
+                     "Optional: upload a CSV file with your own information.",
+                     "A join will be executed on the 'gene_name' column, so please ensure your file has a column named 'gene_name' with gene identifiers formatted as follows: ",
+                     "'Amblyomma-americanum_evm.model.contig-XXXXX-X.X' (for example, Amblyomma-americanum_evm.model.contig-91628-1.2)",
+                     "Once the file is uploaded, you can select a column from your file to color the points in the output plot.",
+                     "If you do not upload a file, points will be colored by significance of differential expression results, inferrered from the filtering criteria specified above."
                    ),
-                   mainPanel(
-                     plotlyOutput("pca_plot"),
-                     DTOutput("metadata_table")
-                   )
-                 )),
-        tabPanel("DE Analysis", 
-                 sidebarLayout(
-                   sidebarPanel(
-                     # Filtering options (log2FC, p-value, basemean)
-                     numericInput("log2FoldChange_filter", "Filter by log2FC", min = -5, max = 5, value = 2),
-                     numericInput("padj_filter", "Filter by p-value", min = 0, max = 1, value = 0.05),
-                     numericInput("basemean_filter", "Filter by basemean", min = 0, max = 10000000, value = 20),
-                     selectInput("condition1", "Condition 1", choices =  NULL, multiple = FALSE),
-                     selectInput("condition2", "Condition 2", choices =  NULL, multiple = FALSE),
-                     helpText(
-                       "Optional: upload a CSV file with your own information.",
-                       "A join will be executed on the 'gene_name' column, so please ensure your file has a column named 'gene_name' with gene identifiers formatted as follows: ",
-                       "'Amblyomma-americanum_evm.model.contig-XXXXX-X.X' (for example, Amblyomma-americanum_evm.model.contig-91628-1.2)",
-                       "Once the file is uploaded, you can select a column from your file to color the points in the output plot.",
-                       "If you do not upload a file, points will be colored by significance of differential expression results, inferrered from the filtering criteria specified above."
-                     ),
-                     fileInput("file", "Choose CSV File", 
-                               accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")),
-                     radioButtons("color_by", "Color Points By", 
-                                  choices = c("Significance" = "significant", "Uploaded Variable" = "uploaded"),
-                                  selected = "significant"),
-                     uiOutput("select_column_ui"), # this will show up only if a file is uploaded
-                     actionButton("get_diff_res", "Get Differential Results"),
-                     downloadButton('download_data', 'Download Filtered Results')
+                   fileInput("file", "Choose CSV File", 
+                             accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")),
+                   radioButtons("color_by", "Color Points By", 
+                                choices = c("Significance" = "significant", "Uploaded Variable" = "uploaded"),
+                                selected = "significant"),
+                   uiOutput("select_column_ui"), # this will show up only if a file is uploaded
+                   actionButton("get_diff_res", "Get Differential Results"),
+                   downloadButton('download_data', 'Download Filtered Results')
+                 ),
+                 mainPanel(
+                   plotlyOutput("volcano_plot"),
+                   plotlyOutput("ma_plot"),
+                   DTOutput("gene_table")
+                 )
+               )),
+      tabPanel("Gene",
+               sidebarLayout(
+                 sidebarPanel(
+                   selectizeInput("selected_gene", "Enter Gene Name:", 
+                                  choices = NULL, multiple = FALSE, options = NULL),
+                   actionButton("plot_gene", "Plot Gene")
+                 ),
+                 mainPanel(
+                   plotlyOutput("gene_boxplot")
+                 )
+               )),
+      tabPanel("Expression by Condition",
+               sidebarLayout(
+                 sidebarPanel(
+                   helpText(
+                     "This tab reports on expression per condition.",
+                     "It uses counts that have been normalized for sequencing depth and undergone variance stabilizing transformation (VST).",
+                     "VST outputs transformed data on the log2 scale.",
+                     "With this method, negative values indicate a count of less than 1, e.g. that the gene is not detected in the given sample.",
+                     "Using this information, we calculate genes that are never expressed in samples in that condition,",
+                     "that are sometimes expressed in samples in that conditions, or that are always expressed.",
+                     "For genes that are always expressed (e.g. expressed in all samples), you can further by the percentile of the genes expression.",
+                     "You can use the minimum count/percentile (the lowest count observed in all samples in the group) or the mean count/percentile."
                    ),
-                   mainPanel(
-                     plotlyOutput("volcano_plot"),
-                     plotlyOutput("ma_plot"),
-                     DTOutput("gene_table")
-                   )
-                 )),
-        tabPanel("Gene",
-                 sidebarLayout(
-                   sidebarPanel(
-                     selectizeInput("selected_gene", "Enter Gene Name:", 
-                                    choices = NULL, multiple = FALSE, options = NULL),
-                     actionButton("plot_gene", "Plot Gene")
-                   ),
-                   mainPanel(
-                     plotlyOutput("gene_boxplot")
-                   )
-                 )),
-        tabPanel("Expression by Condition",
-                 sidebarLayout(
-                   sidebarPanel(
-                     helpText(
-                       "This tab reports on expression per condition.",
-                       "It uses counts that have been normalized for sequencing depth and undergone variance stabilizing transformation (VST).",
-                       "VST outputs transformed data on the log2 scale.",
-                       "With this method, negative values indicate a count of less than 1, e.g. that the gene is not detected in the given sample.",
-                       "Using this information, we calculate genes that are never expressed in samples in that condition,",
-                       "that are sometimes expressed in samples in that conditions, or that are always expressed.",
-                       "For genes that are always expressed (e.g. expressed in all samples), you can further by the percentile of the genes expression.",
-                       "You can use the minimum count/percentile (the lowest count observed in all samples in the group) or the mean count/percentile."
-                     ),
-                     selectInput("condition_input", "Select Condition:", choices = NULL, multiple = FALSE),
-                     radioButtons("expression_metric", "Expression Metric:", choices = c("Minimum" = "min", "Mean" = "mean")),
-                     sliderInput("expression_percentile", "Expression Percentile:", min = 0, max = 100, value = 50),
-                     numericInput("expression_threshold", "Expression Threshold:", value = 0, min = -6),
-                     actionButton("view_expression", "View Expression"),
-                     downloadButton('download_never', 'Download Never Expressed Table'),
-                     downloadButton('download_sometimes', 'Download Sometimes Expressed Table'),
-                     downloadButton('download_always', 'Download Always Expressed Table')
-                   ),
-                   mainPanel(
-                     plotOutput("expression_plot"),
-                     HTML("<h3>Never Expressed Genes</h3>"),
-                     DTOutput("never_expression_table"),
-                     HTML("<h3>Sometimes Expressed Genes</h3>"),
-                     DTOutput("sometimes_expression_table"),
-                     HTML("<h3>Always Expressed Genes</h3>"),
-                     DTOutput("always_expression_table")
-                   )
-                 ))
-      )
+                   selectInput("condition_input", "Select Condition:", choices = NULL, multiple = FALSE),
+                   radioButtons("expression_metric", "Expression Metric:", choices = c("Minimum" = "min", "Mean" = "mean")),
+                   sliderInput("expression_percentile", "Expression Percentile:", min = 0, max = 100, value = 50),
+                   numericInput("expression_threshold", "Expression Threshold:", value = 0, min = -6),
+                   actionButton("view_expression", "View Expression"),
+                   downloadButton('download_never', 'Download Never Expressed Table'),
+                   downloadButton('download_sometimes', 'Download Sometimes Expressed Table'),
+                   downloadButton('download_always', 'Download Always Expressed Table')
+                 ),
+                 mainPanel(
+                   plotOutput("expression_plot"),
+                   HTML("<h3>Never Expressed Genes</h3>"),
+                   DTOutput("never_expression_table"),
+                   HTML("<h3>Sometimes Expressed Genes</h3>"),
+                   DTOutput("sometimes_expression_table"),
+                   HTML("<h3>Always Expressed Genes</h3>"),
+                   DTOutput("always_expression_table")
+                 )
+               ))
     )
   )
 )
-  
+
+
 # server logic ------------------------------------------------------------
-    
-    
+
+
 server <- function(input, output, session) {
 
   # Reactive expression to load and process the selected model
@@ -253,14 +276,14 @@ server <- function(input, output, session) {
       rownames_to_column("gene") %>%
       left_join(annotations)
     
-    # If a file is uploaded and "Uploaded Variable" is selected for coloring
+    # if a file is uploaded and "Uploaded Variable" is selected for coloring, join it to the ds_results_df data.frame
     if (!is.null(input$file) && input$color_by == "uploaded") {
       req(input$color_column)
       uploaded_data <- read_csv(input$file$datapath)
       ds_results_df <- left_join(ds_results_df, uploaded_data(), by = "gene_name")
     }
     
-    # Demarcate significant
+    # demarcate significant
     ds_results_significant <- ds_results_df %>%
       mutate(significant = ifelse(abs(log2FoldChange) >= input$log2FoldChange_filter & 
                                   padj <= input$padj_filter & 
@@ -274,7 +297,7 @@ server <- function(input, output, session) {
   output$volcano_plot <- renderPlotly({
     diff_results_df <- diff_results()
 
-    if(input$color_by == "significance") {
+    if(input$color_by == "significant") {
        color_var <- diff_results_df$significant
        color_name <- "Meets thresholds"
     } else {
@@ -296,7 +319,7 @@ server <- function(input, output, session) {
   output$ma_plot <- renderPlotly({
     diff_results_df <- diff_results()
     
-    if(input$color_by == "significance") {
+    if(input$color_by == "significant") {
       color_var <- diff_results_df$significant
       color_name <- "Meets thresholds"
     } else {

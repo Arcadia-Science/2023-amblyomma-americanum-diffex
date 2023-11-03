@@ -20,7 +20,7 @@ metadata <- read_tsv(snakemake@input[['metadata']], show_col_types = F) %>%
 # create a vector of filenames for quant.sf files
 # solve by parsing library name so that there's a 1:1 match between filename and the file that's read in for that sample
 metadata <- metadata %>%
-  mutate(filepath = paste0("outputs/quantification/", library_name, "_quant/quant.sf"))
+  mutate(filepath = paste0("outputs/quantification/salmon", library_name, "_quant/quant.sf"))
 
 # read in tx2gene file ----------------------------------------------------
 

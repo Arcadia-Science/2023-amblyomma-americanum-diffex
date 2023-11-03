@@ -20,7 +20,7 @@ metadata <- read_tsv(snakemake@input[['metadata']], show_col_types = F) %>%
 # create a vector of filenames for quant.sf files
 # solve by parsing library name so that there's a 1:1 match between filename and the file that's read in for that sample
 metadata <- metadata %>%
-  mutate(filepath = paste0("outputs/quantification/salmon", library_name, "_quant/quant.sf"))
+  mutate(filepath = paste0("outputs/quantification/salmon/", library_name, "_quant/quant.sf"))
 
 # read in tx2gene file ----------------------------------------------------
 
@@ -79,4 +79,4 @@ ds_sex_tissue <- DESeq(dds_sex_tissue, test="Wald")
 
 # write out differential expression models for use in shiny app
 saveRDS(dds_sex_tissue, snakemake@output[['dds_st']])
-saveRDS(ds_sex_tissue, snakemak@output[['ds_st']])
+saveRDS(ds_sex_tissue, snakemake@output[['ds_st']])

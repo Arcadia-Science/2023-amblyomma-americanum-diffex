@@ -14,7 +14,11 @@ RUN_ACCESSIONS = metadata_all["run_accession"].unique().tolist()
 ILLUMINA_LIB_NAMES = metadata_illumina["library_name"].unique().tolist()
 
 rule all:
-    input: "outputs/tx2gene/tx2gene.tsv"
+    input:
+        "shiny/input_data/dds_sex_tissue_blood_meal_hour.RDS",
+        "shiny/input_data/ds_sex_tissue_blood_meal_hour.RDS",
+        "shiny/input_data/dds_sex_tissue.RDS",
+        "shiny/input_data/ds_sex_tissue.RDS"
 
 ######################################
 # Download short & long read data
@@ -178,4 +182,20 @@ rule assign_transcripts_to_genes_by_overlaps_with_gtf_genes:
     python scripts/assign_mapped_transcripts_to_gene_by_gtf_overlap.py {input.gtf} {input.sam} {output}
     '''
 
-rule make_counts:
+rule build_diffex_models:
+    """
+    builds two diffex models. One is built on the combination of sex and tissue and one is built on the combination of sex, tissue, and blood meal hour.
+    designing the models this way allows us to get around our model matrix not being full rank while allowing us to take the most advantage of the biological conditions we do have that have replicates.
+    The outputs of this script are used as input to the shiny app built in this repo.
+    """
+    input:
+        quant = expand("outputs/quantification/salmon/{illumina_lib_name}_quant/quant.sf", illumina_lib_name = ILLUMINA_LIB_NAMES),
+        tx2gene = "outputs/tx2gene/tx2gene.tsv",
+        metadata = "inputs/metadata.tsv"
+    output:
+        dds_stb = "shiny/input_data/dds_sex_tissue_blood_meal_hour.RDS",
+        ds_stb = "shiny/input_data/ds_sex_tissue_blood_meal_hour.RDS",
+        dds_st = "shiny/input_data/dds_sex_tissue.RDS",
+        ds_st = "shiny/input_data/ds_sex_tissue.RDS"
+    conda: "envs/diffex.yml"
+    script: "scripts/build_diffex_models.R"

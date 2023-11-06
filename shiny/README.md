@@ -26,7 +26,7 @@ Once the environment is created, activate it.
 
 ```
 mamba env create -n diffexshiny -f environment.yml
-conda activate diffexshiny.
+conda activate diffexshiny
 ```
 
 To run the Shiny app, execute the following command:
@@ -52,7 +52,7 @@ Below we describe the
 ## Data Preparation
 
 The Shiny app is built from data files that are packaged in the [`input_data`](./input_data) folder in this repository.
-The folder contains metadata associated with the experiment, DESeq2 differential expression models (see the [Snakefile](../Snakefile) in this repository), and [orthologue and functional annotations for the *A. americanum* genome](https://github.com/Arcadia-Science/protein-data-curation).
+The folder contains metadata associated with the experiment, DESeq2 differential expression models (see the [Snakefile](../Snakefile) in this repository), and [ortholog and functional annotations for the *A. americanum* genome](https://github.com/Arcadia-Science/protein-data-curation).
 
 ## Features
 

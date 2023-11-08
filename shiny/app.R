@@ -1,6 +1,7 @@
 # set up environment ------------------------------------------------------
 
 library(shiny)
+library(shinyBS)
 library(DESeq2)
 library(tidyverse)
 library(plotly)
@@ -16,9 +17,10 @@ annotations <- annotations %>%
   mutate(gene = gsub("Amblyomma-americanum_", "", gene_name), .before = gene_name,
          gene = gsub("-", "_", gene),
          gene = gsub(".model", ".TU", gene)) %>%
-  # define a consensus annotation. Use eggnog first, then kegg if eggnog is blank, then deepsig, or nothing
-  mutate(consensus_annotation = ifelse(!is.na(egg_Description), egg_Description,
-                                       ifelse(!is.na(KO_definition), KO_definition, 
+  # define a consensus annotation. Use eggnog first, then kegg if eggnog is blank, then deepsig, or nothing.
+  # also append deepsig feature to eggnog and kegg definitions if deepsig feature is not an NA
+  mutate(consensus_annotation = ifelse(!is.na(egg_Description), paste0(egg_Description, "; ", ifelse(!is.na(deepsig_feature), deepsig_feature, "no deepsig annot")),
+                                       ifelse(!is.na(KO_definition), paste0(KO_definition, "; ", ifelse(!is.na(deepsig_feature), deepsig_feature, "no deepsig annot")),
                                               ifelse(!is.na(deepsig_feature), deepsig_feature, "unknown function")))) %>%
   mutate(combined_gene = paste0(gene_name, "; ", consensus_annotation))
 
@@ -72,16 +74,28 @@ ui <- fluidPage(
       tabPanel("DE Analysis", 
                sidebarLayout(
                  sidebarPanel(
+                   helpText(
+                     "Hover over each box for guidelines of selection filtering values and interpretting results."
+                   ),
                    # Filtering options (log2FC, p-value, basemean)
-                   numericInput("log2FoldChange_filter", "Filter by log2FC", min = -5, max = 5, value = 2),
-                   numericInput("padj_filter", "Filter by p-value", min = 0, max = 1, value = 0.05),
-                   numericInput("basemean_filter", "Filter by basemean", min = 0, max = 10000000, value = 20),
+                   numericInput("log2FoldChange_filter", "Filter by log2FC", min = -5, max = 5, value = 1),
+                   bsTooltip(id = "log2FoldChange_filter",
+                             title = "A threshold of 1 or -1 (corresponding to 2-fold up or down changes) is often used as a starting point. This threshold can help filter out genes with small changes in expression that may not be biologically meaningful."),
+                   numericInput("padj_filter", "Filter by adjusted p-value", min = 0, max = 1, value = 0.05),
+                   bsTooltip(id = "padj_filter",
+                             title = "A threshold of 0.05 is most common, although values ranging from 0.01 to 0.1 are also used. Lower values are more stringent and result in fewer false positivies but possibly more false negatives."),
+                   numericInput("basemean_filter", "Filter by base mean count", min = 5, max = 10000000, value = 10),
+                   bsTooltip(id = "basemean_filter", 
+                             title = "A commonly-used threshold is a base mean count of 10 or higher and this value should not drop below 5 without strong justification. This threshold helps to filter out genes with very low expression, which may be more prone to statistical noise."),
                    selectInput("condition1", "Condition 1", choices =  NULL, multiple = FALSE),
                    selectInput("condition2", "Condition 2", choices =  NULL, multiple = FALSE),
                    helpText(
+                     "Note: Differentially expressed genes with a positive log2FC value are more highly expressed in condition 1."
+                   ),
+                   helpText(
                      "Optional: upload a CSV file with your own information.",
-                     "A join will be executed on the 'gene_name' column, so please ensure your file has a column named 'gene_name' with gene identifiers formatted as follows: ",
-                     "'Amblyomma-americanum_evm.model.contig-XXXXX-X.X' (for example, Amblyomma-americanum_evm.model.contig-91628-1.2)",
+                     "A join will be executed on the 'gene_name' column, so please ensure your file has a column named 'gene_name' with gene identifiers formatted as",
+                     "'Amblyomma-americanum_evm.model.contig-XXXXX-X.X'",
                      "Once the file is uploaded, you can select a column from your file to color the points in the output plot.",
                      "If you do not upload a file, points will be colored by significance of differential expression results, inferrered from the filtering criteria specified above."
                    ),
@@ -103,6 +117,12 @@ ui <- fluidPage(
       tabPanel("Gene",
                sidebarLayout(
                  sidebarPanel(
+                   helpText(
+                     "This tab plots the normalized gene counts for each sample, separated by condition.",
+                     "It uses counts that have been normalized for sequencing depth and undergone variance stabilizing transformation (VST).",
+                     "VST outputs transformed data on the log2 scale.",
+                     "With this method, negative values indicate a count of less than 1, e.g. that the gene is not detected in the given sample."
+                   ),
                    selectizeInput("selected_gene", "Enter Gene Name:", 
                                   choices = NULL, multiple = FALSE, options = NULL),
                    actionButton("plot_gene", "Plot Gene")
@@ -114,6 +134,23 @@ ui <- fluidPage(
       tabPanel("Expression by Condition",
                sidebarLayout(
                  sidebarPanel(
+                   # make a tag to reverse slider highlighting so it goes from user number up to 100
+                   tags$style( type = "text/css", "
+#reverseSlider .irs-bar {
+    border-top: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    background: linear-gradient(to bottom, #DDD -50%, #FFF 150%);
+}
+#reverseSlider .irs-bar-edge {
+    border: 1px solid #ddd;
+    background: linear-gradient(to bottom, #DDD -50%, #FFF 150%);
+    border-right: 0;
+}
+#reverseSlider .irs-line {
+    background: #428bca;
+    border: 1px solid #428bca;
+}
+"),
                    helpText(
                      "This tab reports on expression per condition.",
                      "It uses counts that have been normalized for sequencing depth and undergone variance stabilizing transformation (VST).",
@@ -126,8 +163,12 @@ ui <- fluidPage(
                    ),
                    selectInput("condition_input", "Select Condition:", choices = NULL, multiple = FALSE),
                    radioButtons("expression_metric", "Expression Metric:", choices = c("Minimum" = "min", "Mean" = "mean")),
-                   sliderInput("expression_percentile", "Expression Percentile:", min = 0, max = 100, value = 50),
-                   numericInput("expression_threshold", "Expression Threshold:", value = 0, min = -6),
+                   div(id = "reverseSlider", 
+                       sliderInput(inputId = "expression_percentile", 
+                                  label = "Expression Percentile",
+                                  min = 0, max = 100,
+                                  value = 50)
+                   ),
                    actionButton("view_expression", "View Expression"),
                    downloadButton('download_never', 'Download Never Expressed Table'),
                    downloadButton('download_sometimes', 'Download Sometimes Expressed Table'),
@@ -135,10 +176,6 @@ ui <- fluidPage(
                  ),
                  mainPanel(
                    plotOutput("expression_plot"),
-                   HTML("<h3>Never Expressed Genes</h3>"),
-                   DTOutput("never_expression_table"),
-                   HTML("<h3>Sometimes Expressed Genes</h3>"),
-                   DTOutput("sometimes_expression_table"),
                    HTML("<h3>Always Expressed Genes</h3>"),
                    DTOutput("always_expression_table")
                  )
@@ -161,15 +198,31 @@ server <- function(input, output, session) {
     
     # perform variance stabilize transformation for normalization
     vsd <- vst(ds, blind = FALSE)
+    # extract the VST counts as a matrix
     vsda <- assay(vsd)
+    # reset colnams to sample names
     colnames(vsda) <- vsd$library_name
+    # switch the gene names to the ones used by noveltree and PC
+    tmp <- annotations %>% select(gene, gene_name)
+    vsda <- vsda %>% 
+      as.data.frame() %>% # convert from matrix to data frame
+      rownames_to_column("gene") %>% # add rownames as column
+      left_join(tmp, by = "gene") %>% # join to df with both annotation types
+      mutate(gene_name = ifelse(is.na(gene_name), gene, gene_name)) %>% # replace NA gene_names with gene 
+      select(-gene) %>% # remove gene column
+      column_to_rownames("gene_name") %>% # put gene_name as new rowname
+      as.matrix() # convert back to matrix
+    
     
     # read in metadata and process ----------------
     metadata <- read_tsv("input_data/metadata.tsv") %>%
       filter(tissue != "cell_line") %>% # filter out samples that will make it so model is not full rank
       filter(!study_title %in% "Amblyomma americanum RNA-seq following E. coli treatment") %>% # rm e. coli study, too batched
       filter(!library_name %in% c("Um", "Uf", "Im", "If")) %>% # filter e chaf exposed samples
-      select(library_name, experiment_title, study_title, sex, host_meal, tissue, blood_meal_hour, blood_meal_hour_range, total_spots) %>%
+      select(library_name, run_accession, bioproject, experiment_title,
+             study_title, sex, host_meal, tissue, blood_meal_hour, 
+             blood_meal_hour_range, total_spots, publication_url, 
+             publication_doi, publication_title) %>%
       group_by(library_name) %>%
       mutate(total_spots = sum(total_spots)) %>%
       mutate(blood_meal_hour_range = factor(blood_meal_hour_range, levels = c("0", "12_48", "72_144", "168_264", "none"))) %>%
@@ -305,14 +358,21 @@ server <- function(input, output, session) {
        color_name <- input$color_column
     }
   
-    volcano_plot <- ggplot(diff_results_df, aes(x = log2FoldChange, y = -log10(padj), 
+    volcano_plot <- ggplot(diff_results_df, aes(x = log2FoldChange, 
+                                                y = -log10(padj), 
                                                 color = color_var,
-                                                label = combined_gene)) +
+                                                text = str_wrap(combined_gene, 50))) +
       geom_point(alpha = 0.5) +
-      labs(x = "log2(Fold Change)", y = "-log10(Adjusted p Value (BH))", color = color_name) +
+      labs(x = "log2(Fold Change)", 
+           y = "-log10(Adjusted p Value (BH))", 
+           color = color_name,
+           label = "gene") +
+      geom_hline(yintercept = -log10(input$padj_filter), linetype = 2) +
+      geom_vline(xintercept = input$log2FoldChange_filter, linetype = 2) +
+      geom_vline(xintercept = -input$log2FoldChange_filter, linetype = 2) +
       theme_classic()
     
-    ggplotly(volcano_plot)
+    ggplotly(volcano_plot, tooltip = c("text", "x", "y"))
   })
   
   # MA plot
@@ -327,14 +387,18 @@ server <- function(input, output, session) {
       color_name <- input$color_column
     }
     
-    ma_plot <- ggplot(diff_results_df, aes(x = log2(baseMean), y = log2FoldChange, 
+    ma_plot <- ggplot(diff_results_df, aes(x = log2(baseMean), 
+                                           y = log2FoldChange, 
                                            color = color_var, 
-                                           label = combined_gene)) +
+                                           text = str_wrap(combined_gene, 50))) +
       geom_point(alpha = 0.5) +
       labs(x = "log2(Mean Count)", y = "log2(Fold Change)", color = color_name) +
+      geom_hline(yintercept = input$log2FoldChange_filter, linetype = 2) +
+      geom_hline(yintercept = -input$log2FoldChange_filter, linetype = 2) +
+      geom_vline(xintercept = log2(input$basemean_filter), linetype = 2) +
       theme_classic()
     
-    ggplotly(ma_plot)
+    ggplotly(ma_plot,  tooltip = c("text", "x", "y"))
   })
   
   # significant gene table
@@ -423,7 +487,7 @@ server <- function(input, output, session) {
       group_by(gene) %>%
       summarize(max_vst = max(vst),
                 min_vst = min(vst)) %>%
-      mutate(sometimes_expression = ifelse(max_vst > 0 & min_vst < 0, "sometimes", "other")) %>%
+      mutate(sometimes_expression = ifelse(max_vst >= 0 & min_vst < 0, "sometimes", "other")) %>%
       filter(sometimes_expression == "sometimes") %>%
       select(-sometimes_expression)
     
@@ -479,45 +543,42 @@ server <- function(input, output, session) {
     if(input$expression_metric == "min"){
       expression_plt <- ggplot(expression_list$always_expressed_df, 
                                aes(x = vst, 
-                                   fill = ifelse(min_percentile > input$expression_percentile, TRUE, FALSE)))
+                                   fill = ifelse(min_percentile >= input$expression_percentile, TRUE, FALSE)))
     } else {
       expression_plt <- ggplot(expression_list$always_expressed_df, 
                                aes(x = vst, 
-                                   fill = ifelse(mean_percentile > input$expression_percentile, TRUE, FALSE))) }
+                                   fill = ifelse(mean_percentile >= input$expression_percentile, TRUE, FALSE))) }
     expression_plt + 
       geom_histogram(binwidth = 0.1) +
       labs(title = "Distribution of Normalized Count Values",
            x = "Normalized Counts (VST)",
            y = "Frequency",
-           fill = "Greater than input percentile") +
+           fill = "Greater than or equal\nto input percentile") +
       theme_classic()
   })
   
-  output$never_expression_table <- renderDT({
-    expression_data()$not_expressed_df%>%
-      datatable(options = list(pageLength = 10))
-  })
-  
-  output$sometimes_expression_table <- renderDT({
-    expression_data()$sometimes_expressed_df %>%
-      datatable(options = list(pageLength = 10))
-  })
-
   output$always_expression_table <- renderDT({
     expression_data()$always_expressed_filtered %>%
       select(-expression_metric) %>% # rm internal col used for filtering
       datatable(options = list(pageLength = 10))
   })
-  
+
   # include download handlers for tables
+  output$download_always <- downloadHandler(
+    filename = function() {
+      paste0('always_expressed_', input$condition_input, '.csv')
+    },
+    content = function(file) {
+      write_csv(expression_data()$expressed_df, file)
+    })
+  
   output$download_never <- downloadHandler(
     filename = function() {
       paste0('never_expressed_', input$condition_input, '.csv')
     },
     content = function(file) {
       write_csv(expression_data()$not_expressed_df, file)
-    }
-  )
+    })
   
   output$download_sometimes <- downloadHandler(
     filename = function() {
@@ -525,17 +586,7 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       write_csv(expression_data()$sometimes_expressed_df, file)
-    }
-  )
-  
-  output$download_always <- downloadHandler(
-    filename = function() {
-      paste0('always_expressed_', input$condition_input, '.csv')
-    },
-    content = function(file) {
-      write_csv(expression_data()$expressed_df, file)
-    }
-  )
+    })
 }
 
 

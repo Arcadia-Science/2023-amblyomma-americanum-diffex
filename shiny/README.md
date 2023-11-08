@@ -32,7 +32,7 @@ conda activate diffexshiny
 To run the Shiny app, execute the following command:
 
 ```
-R -e "shiny::runApp('app.R')"
+R -e "shiny::runApp('app.R', port = 6626)"
 ```
 
 This will run the Shiny app from your Terminal.

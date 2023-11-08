@@ -358,17 +358,21 @@ server <- function(input, output, session) {
        color_name <- input$color_column
     }
   
-    volcano_plot <- ggplot(diff_results_df, aes(x = log2FoldChange, y = -log10(padj), 
+    volcano_plot <- ggplot(diff_results_df, aes(x = log2FoldChange, 
+                                                y = -log10(padj), 
                                                 color = color_var,
-                                                label = combined_gene)) +
+                                                text = str_wrap(combined_gene, 50))) +
       geom_point(alpha = 0.5) +
-      labs(x = "log2(Fold Change)", y = "-log10(Adjusted p Value (BH))", color = color_name) +
+      labs(x = "log2(Fold Change)", 
+           y = "-log10(Adjusted p Value (BH))", 
+           color = color_name,
+           label = "gene") +
       geom_hline(yintercept = -log10(input$padj_filter), linetype = 2) +
       geom_vline(xintercept = input$log2FoldChange_filter, linetype = 2) +
       geom_vline(xintercept = -input$log2FoldChange_filter, linetype = 2) +
       theme_classic()
     
-    ggplotly(volcano_plot)
+    ggplotly(volcano_plot, tooltip = c("text", "x", "y"))
   })
   
   # MA plot
@@ -383,9 +387,10 @@ server <- function(input, output, session) {
       color_name <- input$color_column
     }
     
-    ma_plot <- ggplot(diff_results_df, aes(x = log2(baseMean), y = log2FoldChange, 
+    ma_plot <- ggplot(diff_results_df, aes(x = log2(baseMean), 
+                                           y = log2FoldChange, 
                                            color = color_var, 
-                                           label = combined_gene)) +
+                                           text = str_wrap(combined_gene, 50))) +
       geom_point(alpha = 0.5) +
       labs(x = "log2(Mean Count)", y = "log2(Fold Change)", color = color_name) +
       geom_hline(yintercept = input$log2FoldChange_filter, linetype = 2) +
@@ -393,7 +398,7 @@ server <- function(input, output, session) {
       geom_vline(xintercept = log2(input$basemean_filter), linetype = 2) +
       theme_classic()
     
-    ggplotly(ma_plot)
+    ggplotly(ma_plot,  tooltip = c("text", "x", "y"))
   })
   
   # significant gene table

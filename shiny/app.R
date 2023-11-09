@@ -290,7 +290,9 @@ server <- function(input, output, session) {
       coord_fixed() +
       theme_classic()
     
-    ggplotly(pca_plot)
+    ggplotly(pca_plot) %>%
+      # control position of legend to not crowd plot
+      layout(legend = list(orientation = "h", y = -0.25))
   })
   
   output$metadata_table <- renderDT({

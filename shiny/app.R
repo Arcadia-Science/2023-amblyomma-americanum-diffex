@@ -180,7 +180,9 @@ ui <- fluidPage(
                  mainPanel(
                    plotOutput("expression_plot"),
                    HTML("<h3>Always Expressed Genes</h3>"),
-                   DTOutput("always_expression_table")
+                   DTOutput("always_expression_table"),
+                   HTML("<h3>Search for Expression of Genes</h3>"),
+                   DTOutput("search_expression_table")
                  )
                ))
     )
@@ -565,6 +567,22 @@ server <- function(input, output, session) {
   output$always_expression_table <- renderDT({
     expression_data()$always_expressed_filtered %>%
       select(-expression_metric) %>% # rm internal col used for filtering
+      datatable(options = list(pageLength = 10))
+  })
+  
+  output$search_expression_table <- renderDT({
+    always <- expression_data()$always_expressed_df %>%
+      select(gene) %>%
+      mutate(expression_category = "always")
+    sometimes <- expression_data()$sometimes_expressed_df %>%
+      select(gene) %>%
+      mutate(expression_category = "sometimes") 
+    never <- expression_data()$not_expressed_df %>%
+      select(gene) %>%
+      mutate(expression_category = "never")
+    
+    bind_rows(always, sometimes, never) %>%
+      distinct() %>%
       datatable(options = list(pageLength = 10))
   })
 

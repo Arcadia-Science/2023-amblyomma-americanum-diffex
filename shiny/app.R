@@ -123,6 +123,9 @@ ui <- fluidPage(
                      "VST outputs transformed data on the log2 scale.",
                      "With this method, negative values indicate a count of less than 1, e.g. that the gene is not detected in the given sample."
                    ),
+                   helpText(
+                     "NOTE to paste genes instead of scrolling, click on the box, backspace once, and paste your gene."
+                   ),
                    selectizeInput("selected_gene", "Enter Gene Name:", 
                                   choices = NULL, multiple = FALSE, options = NULL),
                    actionButton("plot_gene", "Plot Gene")

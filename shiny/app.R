@@ -7,6 +7,11 @@ library(tidyverse)
 library(plotly)
 library(DT)
 
+# set run options ---------------------------------------------------------
+
+options(shiny.host = "0.0.0.0")
+options(shiny.port = 6626)
+
 # process input data ------------------------------------------------------
 
 # read in and process annotation data

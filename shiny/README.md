@@ -39,10 +39,41 @@ This will run the Shiny app from your Terminal.
 After the Shiny app is running (~5 seconds), you should see a message that says,
 
 ```
-Listening on http://127.0.0.1:6626
+Listening on http://0.0.0.0:6626
 ```
 
 Copy and paste the URL into your browser of choice and the Shiny app should launch!
+
+## Running from a Docker container
+
+First, clone the repository to your local computer.
+Because this is a private repo, GitHub will authenticate your credentials before it allows you to clone.
+If you [followed this lesson](https://training.arcadiascience.com/workshops/20220920-intro-to-git-and-github/lesson/) to set up git on your computer, the authentication should happen automatically.
+
+```
+git clone git@github.com:Arcadia-Science/2023-amblyomma-americanum-diffex.git
+```
+
+Once you have a copy of the repository, change directories (`cd`) into the `shiny` folder in the repo:
+```
+cd 2023-amblyomma-americanum-diffex/shiny
+```
+
+Launch Docker Desktop and then navigate to the Terminal and build the Docker container:
+
+```
+docker build --progress=plain --platform linux/x86_64 -t diffexshiny .
+```
+
+(note that this GitHub repo contains private data, so we have not uploaded the Docker container to Docker Hub.)
+
+Once the Docker container is done building, launch it in a headless state to the 6626 port. 
+```
+docker run -d --platform linux/x86_64 -p 6626:6626 diffexshiny
+```
+
+Lastly, navigate to Docker Desktop and click the "Containers" tab.
+Launch the app by clicking `6626:6626` in the "Port(s)" column.
 
 ## Overview
 

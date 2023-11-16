@@ -85,7 +85,82 @@ The final set of samples we used to perform differential expression are describe
 
 #### Combining variables allows us to build two differential expression models
 
+The majority of samples that we included in our differential expression analysis were not originally sequenced for differential expression analysis.
+This means that most samples did not have replicates; you need at least 2 samples per condition to perform differential expression and statistical power to detect true gene expression differences will increase with increasing numbers of samples.
+Further, to build a differential expression model with the software DESeq2, the statistical design for multi-variable comparisons requires that all the observed variables are present in each combination.
+For example, let's say we're studying expression in males and females when treated with a drug.
+DESeq2 would require the following:
+
+| sample | sex    | treatment |
+|--------|--------|-----------|
+| s1     | male   | control   |
+| s2     | male   | control   |
+| s3     | male   | treatment |
+| s4     | male   | treatment |
+| s5     | female | control   |
+| s6     | female | control   |
+| s7     | female | treatment |
+| s8     | female | treatment |
+
+All combinations of sex and treatment are observed.
+DESeq2 will fail with an error if we have something like this:
+
+| sample | sex    | treatment |
+|--------|--------|-----------|
+| s1     | male   | control   |
+| s2     | male   | control   |
+| s3     | male   | treatment |
+| s4     | male   | treatment |
+| s5     | female | control   |
+| s6     | female | control   |
+
+DESeq2 wouldn't know how to compare male, treatment against female control without female treatment also being present.
+However, it is possible to trick DESeq2 into building a model by combining variables.
+So continuing with the above example, we could do:
+
+| sample | sex_treatment |
+|--------|---------------|
+| s1     | male_control   |
+| s2     | male_control   |
+| s3     | male_treatment |
+| s4     | male_treatment |
+| s5     | female_control |
+| s6     | female_control |
+
+DESeq2 can build this model.
+Then, we can go in and make the comparisons that make sense to make given this experimental design:
+
+* male_control versus male_treatment
+* male_control versus female_control
+
+Since our data were sparse, we had to combine our variables of interest as shown above to be able to build a model.
+We were able to include the most number of samples by combining the variables sex and tissue:
+
+|sex_tissue              |  n|
+|:-----------------------|--:|
+|female_x_midgut         |  3|
+|female_x_salivary_gland |  7|
+|female_x_whole          |  5|
+|male_x_whole            |  5|
+
+However, many people at Arcardia care about how gene expression varies based on time in the blood meal.
+Given this, we built a second model included time in the blood meal hour, only including samples with replicates for different times in the blood meal hour.
+
+|sex_tissue_blood_meal_hour       |  n|
+|:--------------------------------|--:|
+|female_x_midgut_x_72_144         |  2|
+|female_x_salivary_gland_x_12_48  |  2|
+|female_x_salivary_gland_x_72_144 |  3|
+|female_x_whole_x_72_144          |  2|
+|male_x_whole_x_72_144            |  3|
+
+In general, it is better to analyze all samples in a single model, but given the limitations of working with this data, we worked within the bounds of what was possible.
+
 #### Exploring differential expression results using a Shiny App
+
+The goal of this project is to allow Arcadians to explore *A. americanum* differential expression for genes of interest.
+To that end, the primary output of this project is a [Shiny App](./shiny) that allows users to explore the results of the differential expression models we described above.
+Please see the [shiny](./shiny) folder for more information about the model.
 
 ### Lessons learned
 

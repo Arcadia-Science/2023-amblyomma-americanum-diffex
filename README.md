@@ -114,7 +114,7 @@ DESeq2 will fail with an error if we have something like this:
 | s5     | female | control   |
 | s6     | female | control   |
 
-DESeq2 wouldn't know how to compare male, treatment against female control without female treatment also being present.
+DESeq2 wouldn't know how to compare male treatment against female control without female treatment also being present.
 However, it is possible to trick DESeq2 into building a model by combining variables.
 So continuing with the above example, we could do:
 
@@ -166,7 +166,19 @@ Please see the [shiny](./shiny) folder for more information about the model.
 
 #### Lessons learned from gene counting
 
-### Next Steps
+We tried a lot of different approaches to get a gene count matrix, summarized below.
+
+* Genome mapping: We mapped RNA-seq reads against the *A. americanum* genome using STAR and then counted genes using HTSeq delineating genes with the EVM gene annotations. Some libraries had very low mapping rates, I think because the source ticks were less genetically similar to the reference. For libraries that had ~high mapping rates, the percent of reads that were counted as genes was low. Given these low mapping and counting rates, we decided to map against the transcriptome and then explored methods for determining which transcripts encoded which genes. See the notebook [20231027-comparing-counting-methods.ipynb](./notebooks/20231027-comparing-counting-methods.ipynb) for an exploration of the genome mapping rates.
+* Clustering transcripts by shared mapped reads: We experimented with the software libraries Grouper, Compacta, and Corset. All three libraries look at shared mapping and expression of multi-mapped reads to determine which transcripts are likely isoforms of the same genes. We found that Compacta was uninstallable, Grouper errored out in when parsing the config file with a basic Python error, and Compacta ran for over 9 days without progressing past 10% finished. While we think the theory behind these approaches in appropriate for this problem, we didn't pursue these approaches further because the software tools were too difficult to use. 
+* Experimented with new clustering techniques based on shared k-mers in transcripts: We briefly experiment with new approaches for clustering transcripts into genes based on shared k-mer content in [this GitHub repository](https://github.com/Arcadia-Science/2023-sgc-for-isoform-collapse/). We tried two tools, spacegraphcats and kSpider. spacegraphcats clusters transcripts together based on proximity in a compact de Bruijn graph, while kSpider clusters them based on a threshold containment of shared k-mers between transcripts. We found both methods were very promising in initial evaluations and are interested in pursuing both further, but spacegraphcats suffers from [a bug when using long k-mer sizes](https://github.com/spacegraphcats/spacegraphcats/issues/507) while kSpider isn't well documented so it's [unclear how to execute it appropriately](https://github.com/dib-lab/kSpider/issues/39). We hope to continue experimenting with these methods when these issues are resolved.
+
+Given these experiments, we decided to use to map against the transcriptome (since it had higher mapping rates, see [20231027-comparing-counting-methods.ipynb](./notebooks/20231027-comparing-counting-methods.ipynb)) and to assign genes to transcripts based on the gene each transcript overlapped when mapped against the genome.
+We aren't thrilled with this outcome, as it requires an annotated reference genome, but think it was a good enough approach to use in this project.
+
+#### Figuring out what samples can be compared via differential expression analysis before formally analyzing those samples
+
+Using the data analyze in this repo, we tested whether we could determine which samples might be ammenable to differential expression analysis before taking the time to produce a gene count matrix.
+We're trialling a k-mer based approach to perform this type of analysis in the repository [2023-check-rnaseq-for-diffex](https://github.com/Arcadia-Science/2023-check-rnaseq-for-diffex).
 
 ## About the GitHub repository 
 

@@ -6,7 +6,12 @@ This repository contains the workflow for performing differential expression ana
 
 ### Background
  
-The data has been sourced from various SRA studies, and processed to quantify transcripts and perform differential expression analysis.
+This project performed differential expression analysis using *A. americanum* RNA-seq data.
+Differential gene expression analysis is used to identify changes in gene expression between one group of samples and another.
+Genes can either be induced or repressed relative to a control, or show no statistically significant change in expression.
+
+The publicly available data analyzed here had metadata for the variables sex (male, female), tissue (whole tick, salivary gland, midgut), and time in blood meal.
+The final product of this analysis is a [Shiny App](./shiny) that allows users to explore the results of differential expression analyses for these viarables.
 
 ### Methods
 

@@ -1,4 +1,4 @@
-# Differential Expression Analysis of Amblyomma americanum Data
+# Differential Expression Analysis of *Amblyomma americanum* Data
 
 This repository contains the workflow for performing differential expression analysis on publicly available *Amblyomma americanum* data.
 
@@ -11,7 +11,7 @@ Differential gene expression analysis is used to identify changes in gene expres
 Genes can either be induced or repressed relative to a control, or show no statistically significant change in expression.
 
 The publicly available data analyzed here had metadata for the variables sex (male, female), tissue (whole tick, salivary gland, midgut), and time in blood meal.
-The final product of this analysis is a [Shiny App](./shiny) that allows users to explore the results of differential expression analyses for these viarables.
+The final product of this analysis is a [Shiny App](./shiny) that allows users to explore the results of differential expression analyses for these variables.
 The purpose of this dashboard is to allow users to explore the expression of genes of interest in various tick tissues and at different times in a blood meal.
 We hope this information can be used to limit potential genes of interest based on location or timing of expression.
 
@@ -23,7 +23,7 @@ The data analyzed in this repository are obtained from the following SRA studies
 
 - **SRP091404**: 6 samples, Single-end short reads, [Reference](https://doi.org/10.1016/j.aspen.2018.05.009)
 - **SRP446981**: 24 samples, Paired-end short-read [Reference](https://doi.org/10.3389/fcimb.2023.1236785)
-- **SRP032795**: 12 samples (biopanned excluded), Paired-end short-read [Reference](https://doi.org/10.1186/1471-2164-15-518)
+- **SRP032795**: 12 samples (bio-panned excluded), Paired-end short-read [Reference](https://doi.org/10.1186/1471-2164-15-518)
 - **SRP051699**: 4 samples, Paired-end short-read [Reference](https://doi.org/10.1371/journal.pone.0131292)
 - **SRP052078; SRP052091; SRP052108; SRP052106; SRP052114; SRP052123; SRP052145; SRP052154**: 8 samples, Paired-end short-read (not published, no reference)
 
@@ -37,7 +37,7 @@ We quantified transcripts using `salmon`.
 We used the reference transcriptome assembled in the repository [2023-amblyomma-americanum-txome-assembly](https://github.com/Arcadia-Science/2023-amblyomma-americanum-txome-assembly/) to quantify read counts.
 Salmon produces transcript counts however differential expression results are more accurate when gene counts, not transcript counts, are compared.
 The most common way to summarize transcript counts to gene counts is to use a transcript to gene mapping file.
-The R packate `tximport` uses a `tx2gene` file to sum the counts for all transcripts that encode the same gene and to report the gene-level counts.  
+The R package `tximport` uses a `tx2gene` file to sum the counts for all transcripts that encode the same gene and to report the gene-level counts.  
 To generate a transcript -> gene map (`tx2gene` file) for gene-level quantification, we first mapped the reference transcripts back to the genome using uLTRA.
 Then, we assigned a gene name to a transcript when it overlapped part of the genes interval as annotated in the reference GFF3 annotation file produced in the repository [2023-amblyomma-annotation](https://github.com/Arcadia-Science/2023-amblyomma-annotation).
 This step is performed by the script [assign_mapped_transcripts_to_gene_by_gtf_overlap.py](./scripts/assign_mapped_transcripts_to_gene_by_gtf_overlap.py).
@@ -63,7 +63,7 @@ While we had 54 input samples, we were only able to analyze 20.
 An initial exploration of sample similarity is available in the notebook [20231013-differential-expression-by-groups.ipynb](./notebooks/20231013-differential-expression-by-groups.ipynb).
 Below we discuss exclusion criteria for each set of samples that we removed before performing differential expression analysis.
 
-- **SRP091404**: From the six initial samples, we excluded four, samples Um, Uf, Im, and If as these samples were all exposed to the pathogen Ehrlichia chaffeensis [Reference](https://doi.org/10.1016/j.aspen.2018.05.009). Since no other RNA-seq samples in other studies were exposed to this pathogen, we had no way to account for this variable. Further, these samples didn't have replicates, which are required to perform differential expression.
+- **SRP091404**: From the six initial samples, we excluded four, samples Um, Uf, Im, and If as these samples were all exposed to the pathogen *Ehrlichia chaffeensis* [Reference](https://doi.org/10.1016/j.aspen.2018.05.009). Since no other RNA-seq samples in other studies were exposed to this pathogen, we had no way to account for this variable. Further, these samples didn't have replicates, which are required to perform differential expression.
 - **SRP446981**: These 24 samples were excluded because of batch effects. All samples from the study clustered tightly together and away from other similar biological replicates from other studies, indicating the batch effects were too strong to make cross-study comparisons. These samples were all unfed female whole ticks injected either with either PBS (control) or *Escherichia coli*, so it is possible that the injections caused a biological impact that led to the batch effects, but this is not possible to evaluate with the available data [Reference](https://doi.org/10.3389/fcimb.2023.1236785).
 - **SRP052078; SRP052091; SRP052108; SRP052106; SRP052114; SRP052123; SRP052145; SRP052154**: These eight samples originate from two *A. americanum* cell lines. The samples all cluster tightly together and away from other samples. However, since we have no other cell line data from other studies, there is no way for us to evaluate whether they cluster alone because they have different expression or strong batch effects.
 
@@ -152,7 +152,7 @@ We were able to include the most number of samples by combining the variables se
 |female_x_whole          |  5|
 |male_x_whole            |  5|
 
-However, many people at Arcardia care about how gene expression varies based on time in the blood meal.
+However, many people at Arcadia care about how gene expression varies based on time in the blood meal.
 Given this, we built a second model included time in the blood meal hour, only including samples with replicates for different times in the blood meal hour.
 
 |sex_tissue_blood_meal_hour       |  n|
@@ -186,8 +186,8 @@ We aren't thrilled with this outcome, as it requires an annotated reference geno
 
 #### Figuring out what samples can be compared via differential expression analysis before formally analyzing those samples
 
-Using the data analyze in this repo, we tested whether we could determine which samples might be ammenable to differential expression analysis before taking the time to produce a gene count matrix.
-We're trialling a k-mer based approach to perform this type of analysis in the repository [2023-check-rnaseq-for-diffex](https://github.com/Arcadia-Science/2023-check-rnaseq-for-diffex).
+Using the data analyze in this repo, we tested whether we could determine which samples might be amenable to differential expression analysis before taking the time to produce a gene count matrix.
+We're trialing a k-mer based approach to perform this type of analysis in the repository [2023-check-rnaseq-for-diffex](https://github.com/Arcadia-Science/2023-check-rnaseq-for-diffex).
 
 ## About the GitHub repository 
 
@@ -242,7 +242,7 @@ git clone git@github.com:Arcadia-Science/2023-amblyomma-americanum-diffex.git # 
 This repository uses snakemake to run the pipeline and conda to manage software environments and installations.
 You can find operating system-specific instructions for installing miniconda [here](https://docs.conda.io/en/latest/miniconda.html) (see above for linux).
 After installing conda and [mamba](https://mamba.readthedocs.io/en/latest/), run the following command to create the pipeline run environment.
-We installaed Miniconda3 version `py311_23.5.2-0` and mamba version `1.4.9`.
+We installed Miniconda3 version `py311_23.5.2-0` and mamba version `1.4.9`.
 
 ```
 mamba env create -n amam --file environment.yml
@@ -265,6 +265,6 @@ See [this guide](https://github.com/Arcadia-Science/arcadia-software-handbook/bl
 ## IP decision and pub
 
 Currently, we have been advised to keep this GitHub repo private and to not pub out this project.
-This is because the differential expression analysis we performed is trivial and does not itself produce interesting and shareable biological insights, while the repo houses a [Shiny App](./shiny) that may be considered an asset for Trove.
+This is because the differential expression analysis we performed is trivial and does not itself produce interesting and share-able biological insights, while the repo houses a [Shiny App](./shiny) that may be considered an asset for Trove.
 The IP guidance may change over time.
-In the mean time, the READMEs in this repository serve as the main documentation for the project, alongside the Notion Roadmaps in the Software Documentation section.
+In the mean time, the READMEs in this repository serve as the main documentation for the project, alongside the Notion Road maps in the Software Documentation section.

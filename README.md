@@ -12,6 +12,8 @@ Genes can either be induced or repressed relative to a control, or show no stati
 
 The publicly available data analyzed here had metadata for the variables sex (male, female), tissue (whole tick, salivary gland, midgut), and time in blood meal.
 The final product of this analysis is a [Shiny App](./shiny) that allows users to explore the results of differential expression analyses for these viarables.
+The purpose of this dashboard is to allow users to explore the expression of genes of interest in various tick tissues and at different times in a blood meal.
+We hope this information can be used to limit potential genes of interest based on location or timing of expression.
 
 ### Methods
 

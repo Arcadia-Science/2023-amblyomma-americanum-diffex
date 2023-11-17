@@ -22,6 +22,8 @@ The data analyzed in this repository are obtained from the following SRA studies
 
 #### Data preprocessing
 
+We download reads with SRA tools fasterq-dump and quality and adapter trimmed reads with fastp.
+ 
 #### Counting genes
 
 We quantified transcripts using `salmon`. 

@@ -178,9 +178,7 @@ ui <- fluidPage(
                                   value = 50)
                    ),
                    actionButton("view_expression", "View Expression"),
-                   downloadButton('download_never', 'Download Never Expressed Table'),
-                   downloadButton('download_sometimes', 'Download Sometimes Expressed Table'),
-                   downloadButton('download_always', 'Download Always Expressed Table')
+                   downloadButton('download_expression', 'Download Expression Table'),
                  ),
                  mainPanel(
                    plotOutput("expression_plot"),
@@ -196,7 +194,6 @@ ui <- fluidPage(
 
 
 # server logic ------------------------------------------------------------
-
 
 server <- function(input, output, session) {
 
@@ -492,7 +489,8 @@ server <- function(input, output, session) {
     not_expressed_df <- expression_df %>%
       group_by(gene) %>%
       summarize(max_vst = max(vst)) %>%
-      filter(max_vst < 0)
+      filter(max_vst < 0) %>%
+      mutate(expression_category = "never")
     
     # create a df of genes that are sometimes expressed in the input condition
     sometimes_expressed_df <- expression_df %>%
@@ -501,7 +499,8 @@ server <- function(input, output, session) {
                 min_vst = min(vst)) %>%
       mutate(sometimes_expression = ifelse(max_vst >= 0 & min_vst < 0, "sometimes", "other")) %>%
       filter(sometimes_expression == "sometimes") %>%
-      select(-sometimes_expression)
+      select(-sometimes_expression) %>%
+      mutate(expression_category = "sometimes")
     
     # create a df of genes that are always expressed and define magnitude of expression via percentiles
     expressed_df <- expression_df %>%
@@ -520,10 +519,12 @@ server <- function(input, output, session) {
     expressed_df_summary <- expressed_df %>%
       group_by(gene) %>%
       summarize(mean_vst = mean(vst),
-                min_vst = min(vst)) %>%
+                min_vst = min(vst),
+                max_vst = max(vst)) %>%
       rowwise() %>%
       mutate(min_percentile = find_percentile(min_vst, expressed_df_percentiles) - 1,
-             mean_percentile = find_percentile(mean_vst, expressed_df_percentiles) - 1)
+             mean_percentile = find_percentile(mean_vst, expressed_df_percentiles) - 1) %>%
+      mutate(expression_category = "always")
     
     # join the summarized count info with the long-format df
     always_expressed_df <- left_join(expressed_df, expressed_df_summary)
@@ -576,45 +577,34 @@ server <- function(input, output, session) {
   })
   
   output$search_expression_table <- renderDT({
-    always <- expression_data()$always_expressed_df %>%
-      select(gene) %>%
-      mutate(expression_category = "always")
-    sometimes <- expression_data()$sometimes_expressed_df %>%
-      select(gene) %>%
-      mutate(expression_category = "sometimes") 
-    never <- expression_data()$not_expressed_df %>%
-      select(gene) %>%
-      mutate(expression_category = "never")
+    always <- expression_data()$always_expressed_df %>% select(gene, expression_category)
+    sometimes <- expression_data()$sometimes_expressed_df %>% select(gene, expression_category)
+    never <- expression_data()$not_expressed_df %>% select(gene, expression_category)
     
     bind_rows(always, sometimes, never) %>%
       distinct() %>%
       datatable(options = list(pageLength = 10))
   })
+  
+  # include download handler for table
+  output$download_expression <- downloadHandler(
+    filename = function() {
+      paste0("genes_by_expression_", input$condition_input, ".csv")
+    },
 
-  # include download handlers for tables
-  output$download_always <- downloadHandler(
-    filename = function() {
-      paste0('always_expressed_', input$condition_input, '.csv')
-    },
-    content = function(file) {
-      write_csv(expression_data()$expressed_df, file)
-    })
-  
-  output$download_never <- downloadHandler(
-    filename = function() {
-      paste0('never_expressed_', input$condition_input, '.csv')
-    },
-    content = function(file) {
-      write_csv(expression_data()$not_expressed_df, file)
-    })
-  
-  output$download_sometimes <- downloadHandler(
-    filename = function() {
-      paste0('sometimes_expressed_', input$condition_input, '.csv')
-    },
-    content = function(file) {
-      write_csv(expression_data()$sometimes_expressed_df, file)
-    })
+    content = function(file){
+      always <- expression_data()$always_expressed_df %>%
+        select(gene, mean_vst, min_vst, max_vst, min_percentile, mean_percentile, expression_category) %>%
+        distinct()
+      sometimes <- expression_data()$sometimes_expressed_df
+      never <- expression_data()$not_expressed_df
+      
+      all_expression <- bind_rows(always, sometimes, never) %>%
+        distinct()
+      
+      write_csv(all_expression, file)
+    }
+  )
 }
 
 

@@ -6,11 +6,53 @@ library(DESeq2)
 library(tidyverse)
 library(plotly)
 library(DT)
+library(jsonlite)
+library(httr)
 
 # set run options ---------------------------------------------------------
 
 options(shiny.host = "0.0.0.0")
-options(shiny.port = 6626)
+options(shiny.port = 8100)
+
+# OAuth config + functions
+# Inspiration for the OAuth setup: https://gist.github.com/hadley/144c406871768d0cbe66b0b810160528
+
+AUTHORIZED_GITHUB_ORGANIZATION = Sys.getenv("AUTHORIZED_GITHUB_ORGANIZATION")
+oauth_app <- httr::oauth_app("shinygithub",
+  key = Sys.getenv("GITHUB_OAUTH_KEY"),
+  secret = Sys.getenv("GITHUB_OAUTH_SECRET"),
+  redirect_uri = Sys.getenv("APP_URL")
+)
+oauth_endpoint <- httr::oauth_endpoints("github")
+# This defines the OAuth scope for GitHub. Empty scope (read access to user profiles) is sufficient for our needs
+oauth_scope <- ""
+
+is_auth_code_present_in_query_string <- function(params) {
+  return(!is.null(params$code))
+}
+
+create_oauth_token <- function(codeParam) {
+  token <- httr::oauth2.0_token(
+    app = oauth_app,
+    endpoint = oauth_endpoint,
+    credentials = httr::oauth2.0_access_token(oauth_endpoint, oauth_app, codeParam),
+    cache = FALSE
+  )
+  return(token)
+}
+
+get_github_username_with_token <- function(token) {
+  resp <- GET("https://api.github.com/user", httr::config(token = token))
+  content <- jsonlite::fromJSON(httr::content(resp, "text", encoding = "UTF-8"))
+  return(content$login)
+}
+
+get_user_organizations_with_username <- function(username, token) {
+  orgs_url <- sprintf("https://api.github.com/users/%s/orgs", username)
+  orgs <- GET(orgs_url, httr::config(token = token))
+  orgs_json <- jsonlite::fromJSON(httr::content(orgs, "text", encoding = "UTF-8"))
+  return(orgs_json$login)
+}
 
 # process input data ------------------------------------------------------
 
@@ -49,7 +91,7 @@ ui <- fluidPage(
                   choices = c("sex_tissue", "sex_tissue_blood_meal_hour"))
     )
   ),
-  
+
   # CSS to style the header
   tags$style(
     HTML(
@@ -61,14 +103,14 @@ ui <- fluidPage(
       }"
     )
   ),
-  
+
   mainPanel(
     tabsetPanel(
-      tabPanel("PCA Plot", 
+      tabPanel("PCA Plot",
                sidebarLayout(
                  sidebarPanel(
                    # Add a drop-down menu to select the coloring variable
-                   selectInput("color_variable", "Select Coloring Variable", 
+                   selectInput("color_variable", "Select Coloring Variable",
                                choices = c("sex", "tissue", "blood_meal_hour_range", "study_title")),
                  ),
                  mainPanel(
@@ -76,7 +118,7 @@ ui <- fluidPage(
                    DTOutput("metadata_table")
                  )
                )),
-      tabPanel("DE Analysis", 
+      tabPanel("DE Analysis",
                sidebarLayout(
                  sidebarPanel(
                    helpText(
@@ -90,7 +132,7 @@ ui <- fluidPage(
                    bsTooltip(id = "padj_filter",
                              title = "A threshold of 0.05 is most common, although values ranging from 0.01 to 0.1 are also used. Lower values are more stringent and result in fewer false positivies but possibly more false negatives."),
                    numericInput("basemean_filter", "Filter by base mean count", min = 5, max = 10000000, value = 10),
-                   bsTooltip(id = "basemean_filter", 
+                   bsTooltip(id = "basemean_filter",
                              title = "A commonly-used threshold is a base mean count of 10 or higher and this value should not drop below 5 without strong justification. This threshold helps to filter out genes with very low expression, which may be more prone to statistical noise."),
                    selectInput("condition1", "Condition 1", choices =  NULL, multiple = FALSE),
                    selectInput("condition2", "Condition 2", choices =  NULL, multiple = FALSE),
@@ -104,9 +146,9 @@ ui <- fluidPage(
                      "Once the file is uploaded, you can select a column from your file to color the points in the output plot.",
                      "If you do not upload a file, points will be colored by significance of differential expression results, inferrered from the filtering criteria specified above."
                    ),
-                   fileInput("file", "Choose CSV File", 
+                   fileInput("file", "Choose CSV File",
                              accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")),
-                   radioButtons("color_by", "Color Points By", 
+                   radioButtons("color_by", "Color Points By",
                                 choices = c("Significance" = "significant", "Uploaded Variable" = "uploaded"),
                                 selected = "significant"),
                    uiOutput("select_column_ui"), # this will show up only if a file is uploaded
@@ -131,7 +173,7 @@ ui <- fluidPage(
                    helpText(
                      "NOTE to paste genes instead of scrolling, click on the box, backspace once, and paste your gene."
                    ),
-                   selectizeInput("selected_gene", "Enter Gene Name:", 
+                   selectizeInput("selected_gene", "Enter Gene Name:",
                                   choices = NULL, multiple = FALSE, options = NULL),
                    actionButton("plot_gene", "Plot Gene")
                  ),
@@ -171,8 +213,8 @@ ui <- fluidPage(
                    ),
                    selectInput("condition_input", "Select Condition:", choices = NULL, multiple = FALSE),
                    radioButtons("expression_metric", "Expression Metric:", choices = c("Minimum" = "min", "Mean" = "mean")),
-                   div(id = "reverseSlider", 
-                       sliderInput(inputId = "expression_percentile", 
+                   div(id = "reverseSlider",
+                       sliderInput(inputId = "expression_percentile",
                                   label = "Expression Percentile",
                                   min = 0, max = 100,
                                   value = 50)
@@ -192,17 +234,40 @@ ui <- fluidPage(
   )
 )
 
+uiFunc <- function(req) {
+  if (!is_auth_code_present_in_query_string(parseQueryString(req$QUERY_STRING))) {
+    url <- httr::oauth2.0_authorize_url(oauth_endpoint, oauth_app, scope = oauth_scope)
+    redirect <- sprintf("location.replace(\"%s\");", url)
+    tags$script(HTML(redirect))
+  } else {
+    ui
+  }
+}
 
 # server logic ------------------------------------------------------------
 
 server <- function(input, output, session) {
+  params <- parseQueryString(isolate(session$clientData$url_search))
+  if (!is_auth_code_present_in_query_string(params)) {
+    return()
+  }
+
+  oauth_token <- create_oauth_token(params$code)
+  github_username <- get_github_username_with_token(oauth_token)
+  user_organizations <- get_user_organizations_with_username(github_username, oauth_token)
+
+  is_included <- AUTHORIZED_GITHUB_ORGANIZATION %in% user_organizations
+  if (!is_included) {
+    stop("Access denied: Your GitHub account does not belong to the correct organization.")
+  }
+
 
   # Reactive expression to load and process the selected model
   selected_model_data <- reactive({
     # load in selected model data ----------------
     ds <- readRDS(paste0("input_data/ds_", input$selected_model, ".RDS"))
     dds <- readRDS(paste0("input_data/dds_", input$selected_model, ".RDS"))
-    
+
     # perform variance stabilize transformation for normalization
     vsd <- vst(ds, blind = FALSE)
     # extract the VST counts as a matrix
@@ -211,24 +276,24 @@ server <- function(input, output, session) {
     colnames(vsda) <- vsd$library_name
     # switch the gene names to the ones used by noveltree and PC
     tmp <- annotations %>% select(gene, gene_name)
-    vsda <- vsda %>% 
+    vsda <- vsda %>%
       as.data.frame() %>% # convert from matrix to data frame
       rownames_to_column("gene") %>% # add rownames as column
       left_join(tmp, by = "gene") %>% # join to df with both annotation types
-      mutate(gene_name = ifelse(is.na(gene_name), gene, gene_name)) %>% # replace NA gene_names with gene 
+      mutate(gene_name = ifelse(is.na(gene_name), gene, gene_name)) %>% # replace NA gene_names with gene
       select(-gene) %>% # remove gene column
       column_to_rownames("gene_name") %>% # put gene_name as new rowname
       as.matrix() # convert back to matrix
-    
-    
+
+
     # read in metadata and process ----------------
     metadata <- read_tsv("input_data/metadata.tsv") %>%
       filter(tissue != "cell_line") %>% # filter out samples that will make it so model is not full rank
       filter(!study_title %in% "Amblyomma americanum RNA-seq following E. coli treatment") %>% # rm e. coli study, too batched
       filter(!library_name %in% c("Um", "Uf", "Im", "If")) %>% # filter e chaf exposed samples
       select(library_name, run_accession, bioproject, experiment_title,
-             study_title, sex, host_meal, tissue, blood_meal_hour, 
-             blood_meal_hour_range, total_spots, publication_url, 
+             study_title, sex, host_meal, tissue, blood_meal_hour,
+             blood_meal_hour_range, total_spots, publication_url,
              publication_doi, publication_title) %>%
       group_by(library_name) %>%
       mutate(total_spots = sum(total_spots)) %>%
@@ -249,10 +314,10 @@ server <- function(input, output, session) {
       metadata <- metadata %>%
         filter(sex_tissue_blood_meal_hour %in% metadata_tally$sex_tissue_blood_meal_hour)
     }
-    
+
     list(ds = ds, dds = dds, vsd = vsd, vsda = vsda, metadata = metadata)
   })
-  
+
   # Update the condition choices based on the selected model
   observe({
     model_data <- selected_model_data()
@@ -272,9 +337,9 @@ server <- function(input, output, session) {
                         choices = c("female_x_salivary_gland_x_72_144", "male_x_whole_x_72_144", "female_x_midgut_x_72_144", "female_x_salivary_gland_x_12_48", "female_x_whole_x_72_144"))
     }
   })
-  
+
   # create a function to get model data
-  
+
   # overview (PCA plot, metadata table) -------------------------------------
 
   # PCA plot
@@ -287,8 +352,8 @@ server <- function(input, output, session) {
       mutate(library_name = vsd$library_name) %>%
       left_join(metadata)
     percentVar <- round(100 * attr(pcad, "percentVar"))
-    
-    pca_plot <- ggplot(pcad, aes(PC1, PC2, color = !!sym(input$color_variable), 
+
+    pca_plot <- ggplot(pcad, aes(PC1, PC2, color = !!sym(input$color_variable),
                                  label = library_name)) +
       geom_point(size = 3) +
       labs(x = paste0("PC1: ", percentVar[1], "% variance"),
@@ -296,18 +361,18 @@ server <- function(input, output, session) {
            color = input$color_variable) +
       coord_fixed() +
       theme_classic()
-    
+
     ggplotly(pca_plot) %>%
       # control position of legend to not crowd plot
       layout(legend = list(orientation = "h", y = -0.25))
   })
-  
+
   output$metadata_table <- renderDT({
     model_data <- selected_model_data()
     model_data$metadata %>%
       datatable(options = list(pageLength = 10))
   })
-  
+
   # differential expression results (volcano plot, table) -------------
 
   # Process the user-provided uploaded file
@@ -315,13 +380,13 @@ server <- function(input, output, session) {
     req(input$file)
     read_csv(input$file$datapath)
   })
-  
+
   # Dynamic UI for selecting a column from the uploaded data
   output$select_column_ui <- renderUI({
     req(input$file)  # Only show if a file is uploaded
     selectInput("color_column", "Select Column to Color By", choices = names(uploaded_data()))
   })
-  
+
   # Extract deseq2 results and return df
   diff_results <- eventReactive(input$get_diff_res, {
     model_data <- selected_model_data()
@@ -330,31 +395,31 @@ server <- function(input, output, session) {
     selected_contrast <- input$selected_model
     selected_condition1 <- input$condition1
     selected_condition2 <- input$condition2
-    
+
     # Extract differential expression results based on selected contrasts and conditions
     ds_results <- results(ds, contrast = c(selected_contrast, selected_condition1, selected_condition2))
     ds_results_df <- ds_results %>%
       as.data.frame() %>%
       rownames_to_column("gene") %>%
       left_join(annotations)
-    
+
     # if a file is uploaded and "Uploaded Variable" is selected for coloring, join it to the ds_results_df data.frame
     if (!is.null(input$file) && input$color_by == "uploaded") {
       req(input$color_column)
       uploaded_data <- read_csv(input$file$datapath)
       ds_results_df <- left_join(ds_results_df, uploaded_data(), by = "gene_name")
     }
-    
+
     # demarcate significant
     ds_results_significant <- ds_results_df %>%
-      mutate(significant = ifelse(abs(log2FoldChange) >= input$log2FoldChange_filter & 
-                                  padj <= input$padj_filter & 
+      mutate(significant = ifelse(abs(log2FoldChange) >= input$log2FoldChange_filter &
+                                  padj <= input$padj_filter &
                                   baseMean >= input$basemean_filter, "significant", "not significant"))
-    
+
     # Return the filtered data frame
     ds_results_significant
   })
-  
+
   # volcano plot
   output$volcano_plot <- renderPlotly({
     diff_results_df <- diff_results()
@@ -366,28 +431,28 @@ server <- function(input, output, session) {
        color_var <- diff_results_df[[input$color_column]]
        color_name <- input$color_column
     }
-  
-    volcano_plot <- ggplot(diff_results_df, aes(x = log2FoldChange, 
-                                                y = -log10(padj), 
+
+    volcano_plot <- ggplot(diff_results_df, aes(x = log2FoldChange,
+                                                y = -log10(padj),
                                                 color = color_var,
                                                 text = str_wrap(combined_gene, 50))) +
       geom_point(alpha = 0.5) +
-      labs(x = "log2(Fold Change)", 
-           y = "-log10(Adjusted p Value (BH))", 
+      labs(x = "log2(Fold Change)",
+           y = "-log10(Adjusted p Value (BH))",
            color = color_name,
            label = "gene") +
       geom_hline(yintercept = -log10(input$padj_filter), linetype = 2) +
       geom_vline(xintercept = input$log2FoldChange_filter, linetype = 2) +
       geom_vline(xintercept = -input$log2FoldChange_filter, linetype = 2) +
       theme_classic()
-    
+
     ggplotly(volcano_plot, tooltip = c("text", "x", "y"))
   })
-  
+
   # MA plot
   output$ma_plot <- renderPlotly({
     diff_results_df <- diff_results()
-    
+
     if(input$color_by == "significant") {
       color_var <- diff_results_df$significant
       color_name <- "Meets thresholds"
@@ -395,10 +460,10 @@ server <- function(input, output, session) {
       color_var <- diff_results_df[[input$color_column]]
       color_name <- input$color_column
     }
-    
-    ma_plot <- ggplot(diff_results_df, aes(x = log2(baseMean), 
-                                           y = log2FoldChange, 
-                                           color = color_var, 
+
+    ma_plot <- ggplot(diff_results_df, aes(x = log2(baseMean),
+                                           y = log2FoldChange,
+                                           color = color_var,
                                            text = str_wrap(combined_gene, 50))) +
       geom_point(alpha = 0.5) +
       labs(x = "log2(Mean Count)", y = "log2(Fold Change)", color = color_name) +
@@ -406,17 +471,17 @@ server <- function(input, output, session) {
       geom_hline(yintercept = -input$log2FoldChange_filter, linetype = 2) +
       geom_vline(xintercept = log2(input$basemean_filter), linetype = 2) +
       theme_classic()
-    
+
     ggplotly(ma_plot,  tooltip = c("text", "x", "y"))
   })
-  
+
   # significant gene table
   output$gene_table <- renderDT({
     diff_results() %>%
       filter(significant == "significant") %>%
       datatable(options = list(pageLength = 10))
   })
-  
+
   output$download_data <- downloadHandler(
     filename = function() {
       paste0('filtered_results',
@@ -433,9 +498,9 @@ server <- function(input, output, session) {
       write_tsv(ds_results, file)
     }
   )
-  
+
   # gene-specific visualization ------------------------------------------
-  # update the choices for selected_gene -- using server-side selectize speeds up gene selection 
+  # update the choices for selected_gene -- using server-side selectize speeds up gene selection
   # bc we have 30k genes to choose from
   observe({
     model_data <- selected_model_data()
@@ -450,7 +515,7 @@ server <- function(input, output, session) {
     metadata <- model_data$metadata
     vsda <- model_data$vsda
     selected_gene <- input$selected_gene
-    
+
     if (!is.null(selected_gene)) {
       gene_data <- data.frame(gene_count = vsda[selected_gene, ]) %>%
         rownames_to_column("library_name") %>%
@@ -466,13 +531,13 @@ server <- function(input, output, session) {
       ggplotly(gene_boxplot)
     }
   })
-  
+
   # expression by condition -------------------------------------------------
   expression_data <- reactive({
     model_data <- selected_model_data()
     metadata <- model_data$metadata
     vsda <- model_data$vsda
-    
+
     req(input$view_expression)  # ensure the button is clicked
     req(input$condition_input)  # ensure a contrast is selected
     # Filter the expression data for the selected contrast
@@ -484,14 +549,14 @@ server <- function(input, output, session) {
       as.data.frame() %>%
       rownames_to_column("gene") %>%
       pivot_longer(cols = -gene, names_to = "library_name", values_to = "vst")
-    
+
     # create a df of genes that are never expressed in the input condition
     not_expressed_df <- expression_df %>%
       group_by(gene) %>%
       summarize(max_vst = max(vst)) %>%
       filter(max_vst < 0) %>%
       mutate(expression_category = "never")
-    
+
     # create a df of genes that are sometimes expressed in the input condition
     sometimes_expressed_df <- expression_df %>%
       group_by(gene) %>%
@@ -501,20 +566,20 @@ server <- function(input, output, session) {
       filter(sometimes_expression == "sometimes") %>%
       select(-sometimes_expression) %>%
       mutate(expression_category = "sometimes")
-    
+
     # create a df of genes that are always expressed and define magnitude of expression via percentiles
     expressed_df <- expression_df %>%
       filter(!gene %in% not_expressed_df$gene) %>%
       filter(!gene %in% sometimes_expressed_df$gene)
-    
+
     # calculate percentile of expression for genes that are always expressed
     expressed_df_percentiles <- quantile(x = expressed_df$vst, probs = seq(0, 1, by = 0.01))
-    
+
     # define a function for finding the percentile in a group
     find_percentile <- function(value, percentiles) {
       sum(value >= percentiles)
     }
-    
+
     # calculate the minimum and mean expression for each gene across samples
     expressed_df_summary <- expressed_df %>%
       group_by(gene) %>%
@@ -525,23 +590,23 @@ server <- function(input, output, session) {
       mutate(min_percentile = find_percentile(min_vst, expressed_df_percentiles) - 1,
              mean_percentile = find_percentile(mean_vst, expressed_df_percentiles) - 1) %>%
       mutate(expression_category = "always")
-    
+
     # join the summarized count info with the long-format df
     always_expressed_df <- left_join(expressed_df, expressed_df_summary)
-    
+
     # determine the expression metric and percentile to use for filtering
     expressed_df_summary$expression_metric <- if(input$expression_metric == "min"){
       expressed_df_summary$min_percentile
     } else {
       expressed_df_summary$mean_percentile
     }
-    
+
     expression_percentile <- input$expression_percentile
-    
+
     # filter the always expressed genes by the chosen percentile
     always_expressed_filtered <- expressed_df_summary %>%
       filter(expression_metric >= expression_percentile)
-    
+
     return(list(always_expressed_df = always_expressed_df,
                 always_expressed_filtered = always_expressed_filtered,
                 not_expressed_df = not_expressed_df,
@@ -550,18 +615,18 @@ server <- function(input, output, session) {
 
   # plot the distribution of expression values for genes that are always expressed
   output$expression_plot <- renderPlot({
-    
+
     expression_list <- expression_data()
-    
+
     if(input$expression_metric == "min"){
-      expression_plt <- ggplot(expression_list$always_expressed_df, 
-                               aes(x = vst, 
+      expression_plt <- ggplot(expression_list$always_expressed_df,
+                               aes(x = vst,
                                    fill = ifelse(min_percentile >= input$expression_percentile, TRUE, FALSE)))
     } else {
-      expression_plt <- ggplot(expression_list$always_expressed_df, 
-                               aes(x = vst, 
+      expression_plt <- ggplot(expression_list$always_expressed_df,
+                               aes(x = vst,
                                    fill = ifelse(mean_percentile >= input$expression_percentile, TRUE, FALSE))) }
-    expression_plt + 
+    expression_plt +
       geom_histogram(binwidth = 0.1) +
       labs(title = "Distribution of Normalized Count Values",
            x = "Normalized Counts (VST)",
@@ -569,23 +634,23 @@ server <- function(input, output, session) {
            fill = "Greater than or equal\nto input percentile") +
       theme_classic()
   })
-  
+
   output$always_expression_table <- renderDT({
     expression_data()$always_expressed_filtered %>%
       select(-expression_metric) %>% # rm internal col used for filtering
       datatable(options = list(pageLength = 10))
   })
-  
+
   output$search_expression_table <- renderDT({
     always <- expression_data()$always_expressed_df %>% select(gene, expression_category)
     sometimes <- expression_data()$sometimes_expressed_df %>% select(gene, expression_category)
     never <- expression_data()$not_expressed_df %>% select(gene, expression_category)
-    
+
     bind_rows(always, sometimes, never) %>%
       distinct() %>%
       datatable(options = list(pageLength = 10))
   })
-  
+
   # include download handler for table
   output$download_expression <- downloadHandler(
     filename = function() {
@@ -598,10 +663,10 @@ server <- function(input, output, session) {
         distinct()
       sometimes <- expression_data()$sometimes_expressed_df
       never <- expression_data()$not_expressed_df
-      
+
       all_expression <- bind_rows(always, sometimes, never) %>%
         distinct()
-      
+
       write_csv(all_expression, file)
     }
   )
@@ -610,4 +675,4 @@ server <- function(input, output, session) {
 
 # run server --------------------------------------------------------------
 
-shinyApp(ui = ui, server = server)
+shinyApp(ui = uiFunc, server = server)

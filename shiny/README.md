@@ -1,4 +1,4 @@
-# Differential Expression Explorer Shiny App for *Amblyomma americanum*
+# Differential Expression Explorer Shiny App for _Amblyomma americanum_
 
 ## Quick Start
 
@@ -21,7 +21,7 @@ cd 2023-amblyomma-americanum-diffex/shiny
 
 The Shiny app relies on a few R packages.
 To simplify installation of these dependencies, we created an [`environment.yml`](./environment.yml) file that can be used with conda (or mamba) to create an environment for the Shiny app to run in.
-If you don't already have conda installed, you can follow the instructions in [this lesson](https://training.arcadiascience.com/arcadia-users-group/20221017-conda/lesson/) to install it. 
+If you don't already have conda installed, you can follow the instructions in [this lesson](https://training.arcadiascience.com/arcadia-users-group/20221017-conda/lesson/) to install it.
 Once the environment is created, activate it.
 
 ```
@@ -29,17 +29,25 @@ mamba env create -n diffexshiny -f environment.yml
 conda activate diffexshiny
 ```
 
+The Shiny app relies, on a couple environment variables.
+To get started, make a copy of the [.Renviron.dev](/shiny/.Renvrion.dev) and fill in the values.
+If you don't have access to the correct values, ping the software team.
+
+```
+cd shiny/ && cp .Renviron.dev .Renviron
+```
+
 To run the Shiny app, execute the following command:
 
 ```
-R -e "shiny::runApp('app.R', port = 6626)"
+R -e "shiny::runApp('app.R', port = 8100)"
 ```
 
 This will run the Shiny app from your Terminal.
 After the Shiny app is running (~5 seconds), you should see a message that says,
 
 ```
-Listening on http://0.0.0.0:6626
+Listening on http://0.0.0.0:8100
 ```
 
 Copy and paste the URL into your browser of choice and the Shiny app should launch!
@@ -55,6 +63,7 @@ git clone git@github.com:Arcadia-Science/2023-amblyomma-americanum-diffex.git
 ```
 
 Once you have a copy of the repository, change directories (`cd`) into the `shiny` folder in the repo:
+
 ```
 cd 2023-amblyomma-americanum-diffex/shiny
 ```
@@ -67,9 +76,10 @@ docker build --progress=plain --platform linux/x86_64 -t diffexshiny .
 
 (note that this GitHub repo contains private data, so we have not uploaded the Docker container to Docker Hub.)
 
-Once the Docker container is done building, launch it in a headless state to the 6626 port. 
+Once the Docker container is done building, launch it in a headless state to the 8100 port.
+
 ```
-docker run -d --platform linux/x86_64 -p 6626:6626 diffexshiny
+docker run -d --platform linux/x86_64 -p 8100:8100 diffexshiny
 ```
 
 Lastly, navigate to Docker Desktop and click the "Containers" tab.
@@ -77,13 +87,12 @@ Launch the app by clicking `6626:6626` in the "Port(s)" column.
 
 ## Overview
 
-This Shiny application serves as an interactive tool for exploring differential gene expression results derived from two differential expression models built from publicly available short read RNA-seq data for the lone star tick *Amblyomma americanum*.
-Below we describe the 
+This Shiny application serves as an interactive tool for exploring differential gene expression results derived from two differential expression models built from publicly available short read RNA-seq data for the lone star tick _Amblyomma americanum_.
 
 ## Data Preparation
 
 The Shiny app is built from data files that are packaged in the [`input_data`](./input_data) folder in this repository.
-The folder contains metadata associated with the experiment, DESeq2 differential expression models (see the [Snakefile](../Snakefile) in this repository), and [ortholog and functional annotations for the *A. americanum* genome](https://github.com/Arcadia-Science/protein-data-curation).
+The folder contains metadata associated with the experiment, DESeq2 differential expression models (see the [Snakefile](../Snakefile) in this repository), and [ortholog and functional annotations for the _A. americanum_ genome](https://github.com/Arcadia-Science/protein-data-curation).
 
 ## Features
 
@@ -118,7 +127,7 @@ Users can view expression distribution and download tables of genes that are nev
 Sometimes the Shiny app may freeze.
 In testing, this happened most frequently on the DE Analysis tab when trying to switch which data was plotted (e.g. switching models or adding user data).
 If this happens, the best thing to do is to exit the browser tab, kill the Shiny app by pressing <kbd>ctrl</kbd> + <kbd>c</kbd>, and to relaunch it with the R command `R -e "shiny::runApp('app.R')"`.
-Then, make sure the first data you plot in the DE Analysis tab is the data that froze the app.  
+Then, make sure the first data you plot in the DE Analysis tab is the data that froze the app.
 
 ## Next Steps
 

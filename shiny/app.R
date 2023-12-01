@@ -74,6 +74,17 @@ annotations <- annotations %>%
 # ui logic ----------------------------------------------------------------
 
 ui <- fluidPage(
+  # Landing page overlay
+  tags$div(
+    id = "landing_page",
+    style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #333; color: white; z-index: 2000;",
+    div(
+      style = "position: relative; top: 30%; left: 30%;",
+      h1("Welcome"),
+      actionButton("enter_app", "Enter", class = "btn-primary", style="font-size: 20px; padding: 10px 20px;")
+    )
+  ),
+  
   # custom header so model selection is reactive & at the top of the app
   tags$header(
     tags$div(
@@ -231,7 +242,15 @@ ui <- fluidPage(
                  )
                ))
     )
-  )
+  ),
+  # Include this JavaScript to hide the landing page when 'Enter' is clicked
+  tags$script(HTML("
+    $(document).ready(function(){
+        $('#enter_app').on('click', function() {
+            $('#landing_page').hide();
+        });
+    });
+  "))
 )
 
 ui_with_auth <- function(req) {

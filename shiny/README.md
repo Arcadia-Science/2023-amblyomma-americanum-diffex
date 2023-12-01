@@ -29,7 +29,9 @@ mamba env create -n diffexshiny -f environment.yml
 conda activate diffexshiny
 ```
 
-The Shiny app relies, on a couple environment variables. To get started, make a cope of the [.Renviron.dev](/shiny/.Renvrion.dev) and fill in the values. If you don't have access to the correct values, ping the software team.
+The Shiny app relies, on a couple environment variables.
+To get started, make a copy of the [.Renviron.dev](/shiny/.Renvrion.dev) and fill in the values.
+If you don't have access to the correct values, ping the software team.
 
 ```
 cd shiny/ && cp .Renviron.dev .Renviron

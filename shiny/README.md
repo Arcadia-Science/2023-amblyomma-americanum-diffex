@@ -74,7 +74,7 @@ docker build --progress=plain --platform linux/x86_64 -t diffexshiny .
 
 (note that this GitHub repo contains private data, so we have not uploaded the Docker container to Docker Hub.)
 
-Once the Docker container is done building, launch it in a headless state to the 6626 port.
+Once the Docker container is done building, launch it in a headless state to the 8100 port.
 
 ```
 docker run -d --platform linux/x86_64 -p 8100:8100 diffexshiny

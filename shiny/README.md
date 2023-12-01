@@ -86,7 +86,6 @@ Launch the app by clicking `6626:6626` in the "Port(s)" column.
 ## Overview
 
 This Shiny application serves as an interactive tool for exploring differential gene expression results derived from two differential expression models built from publicly available short read RNA-seq data for the lone star tick _Amblyomma americanum_.
-Below we describe the
 
 ## Data Preparation
 

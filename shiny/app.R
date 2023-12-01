@@ -234,7 +234,7 @@ ui <- fluidPage(
   )
 )
 
-uiFunc <- function(req) {
+ui_with_auth <- function(req) {
   if (!is_auth_code_present_in_query_string(parseQueryString(req$QUERY_STRING))) {
     url <- httr::oauth2.0_authorize_url(oauth_endpoint, oauth_app, scope = oauth_scope)
     redirect <- sprintf("location.replace(\"%s\");", url)
@@ -675,4 +675,4 @@ server <- function(input, output, session) {
 
 # run server --------------------------------------------------------------
 
-shinyApp(ui = uiFunc, server = server)
+shinyApp(ui = ui_with_auth, server = server)

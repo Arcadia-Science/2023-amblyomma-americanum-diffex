@@ -77,7 +77,7 @@ docker build --progress=plain --platform linux/x86_64 -t diffexshiny .
 Once the Docker container is done building, launch it in a headless state to the 6626 port.
 
 ```
-docker run -d --platform linux/x86_64 -p 6626:6626 diffexshiny
+docker run -d --platform linux/x86_64 -p 8100:8100 diffexshiny
 ```
 
 Lastly, navigate to Docker Desktop and click the "Containers" tab.

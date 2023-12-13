@@ -25,7 +25,7 @@ oauth_app <- httr::oauth_app("shinygithub",
 )
 oauth_endpoint <- httr::oauth_endpoints("github")
 # This defines the OAuth scope for GitHub. Empty scope (read access to user profiles) is sufficient for our needs
-oauth_scope <- ""
+oauth_scope <- "read:org"
 
 is_auth_code_present_in_query_string <- function(params) {
   return(!is.null(params$code))

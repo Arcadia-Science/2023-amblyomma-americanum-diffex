@@ -157,4 +157,5 @@ Then, make sure the first data you plot in the DE Analysis tab is the data that 
 
 ## Next Steps
 
-We would like to figure out a way to host the Shiny app so users can navigate to a URL to use the application.
+We don't have any next steps planned for the app.
+If you have ideas about missing functionality or data, talk to the software team or file and issue on the repo.

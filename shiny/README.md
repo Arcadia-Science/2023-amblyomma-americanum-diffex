@@ -2,8 +2,19 @@
 
 ## Quick Start
 
-Currently, the Shiny app is not hosted so it needs to be run locally to be accessed by the user.
-Below we provide instructions for how to run the Shiny app.
+1. Navigate to [aa-diffex.arcadiascience.com](aa-diffex.arcadiascience.com).
+2. Log in with your GitHub credentials and authorize the app.
+3. Select a model from the upper-most drop down menu & explore the graphs and analyses available in each tab. See the [Feature of the App](#features-of-the-app) section below for more information.
+
+### Known bugs
+
+* If you refresh the page, it may grey out. Re-navigate to the url [aa-diffex.arcadiascience.com](aa-diffex.arcadiascience.com) and continue exploring.
+* GitHub authentication is based on your organization membership. **You must be a member of the Arcadia-Science GitHub organization to get access to the app.** Ping the software team if you are not a member and they can grant you membership.
+
+## Running and Developing Locally
+
+Below we provide instructions for how to run the Shiny app locally.
+This is useful if you want to add new functionality to the app.
 
 First, clone the repository to your local computer.
 Because this is a private repo, GitHub will authenticate your credentials before it allows you to clone.
@@ -50,7 +61,18 @@ After the Shiny app is running (~5 seconds), you should see a message that says,
 Listening on http://0.0.0.0:8100
 ```
 
-Copy and paste the URL into your browser of choice and the Shiny app should launch!
+Copy and paste the URL into your browser of choice and the Shiny app should launch.
+Even when running locally, the app expects you to authenticate.
+When the app launches, you should see a GitHub login screen.
+Log in and authorize the app.
+You should be redirected to the Shiny app after logging in.
+
+If you have any trouble logging in, try and run the app from a new Private Browser/Incognito window.
+Close all other private browsing tabs and windows before opening a new one and copy and pasting the Shiny app URL into the tab.
+
+These instructions assume that you will run the app from the command line.
+**Do not try and run the app from RStudio.**
+The GitHub authentication doesn't play well with RStudio -- RStudio tries to launch multiple (~100) new tabs for the app when it doesn't immediately launch because of the authenication page.
 
 ## Running from a Docker container
 
@@ -85,7 +107,7 @@ docker run -d --platform linux/x86_64 -p 8100:8100 diffexshiny
 Lastly, navigate to Docker Desktop and click the "Containers" tab.
 Launch the app by clicking `6626:6626` in the "Port(s)" column.
 
-## Overview
+## Overview of the App
 
 This Shiny application serves as an interactive tool for exploring differential gene expression results derived from two differential expression models built from publicly available short read RNA-seq data for the lone star tick _Amblyomma americanum_.
 
@@ -94,7 +116,7 @@ This Shiny application serves as an interactive tool for exploring differential 
 The Shiny app is built from data files that are packaged in the [`input_data`](./input_data) folder in this repository.
 The folder contains metadata associated with the experiment, DESeq2 differential expression models (see the [Snakefile](../Snakefile) in this repository), and [ortholog and functional annotations for the _A. americanum_ genome](https://github.com/Arcadia-Science/protein-data-curation).
 
-## Features
+## Features of the App
 
 ### Model Selection
 
@@ -126,9 +148,14 @@ Users can view expression distribution and download tables of genes that are nev
 
 Sometimes the Shiny app may freeze.
 In testing, this happened most frequently on the DE Analysis tab when trying to switch which data was plotted (e.g. switching models or adding user data).
-If this happens, the best thing to do is to exit the browser tab, kill the Shiny app by pressing <kbd>ctrl</kbd> + <kbd>c</kbd>, and to relaunch it with the R command `R -e "shiny::runApp('app.R')"`.
+If this happens:
+
+* **When running in the browser:** exit the tab and re-launch the URL in a new tab.
+* **When running locally:** the best thing to do is to exit the browser tab, kill the Shiny app by pressing <kbd>ctrl</kbd> + <kbd>c</kbd>, and to relaunch it with the R command `R -e "shiny::runApp('app.R', port = 8100)"`.
+
 Then, make sure the first data you plot in the DE Analysis tab is the data that froze the app.
 
 ## Next Steps
 
-We would like to figure out a way to host the Shiny app so users can navigate to a URL to use the application.
+We don't have any next steps planned for the app.
+If you have ideas about missing functionality or data, talk to the software team or file and issue on the repo.

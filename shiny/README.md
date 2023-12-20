@@ -148,7 +148,11 @@ Users can view expression distribution and download tables of genes that are nev
 
 Sometimes the Shiny app may freeze.
 In testing, this happened most frequently on the DE Analysis tab when trying to switch which data was plotted (e.g. switching models or adding user data).
-If this happens, the best thing to do is to exit the browser tab, kill the Shiny app by pressing <kbd>ctrl</kbd> + <kbd>c</kbd>, and to relaunch it with the R command `R -e "shiny::runApp('app.R')"`.
+If this happens:
+
+* **When running in the browser:** exit the tab and re-launch the URL in a new tab.
+* **When running locally:** the best thing to do is to exit the browser tab, kill the Shiny app by pressing <kbd>ctrl</kbd> + <kbd>c</kbd>, and to relaunch it with the R command `R -e "shiny::runApp('app.R', port = 8100)"`.
+
 Then, make sure the first data you plot in the DE Analysis tab is the data that froze the app.
 
 ## Next Steps

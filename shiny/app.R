@@ -47,11 +47,41 @@ get_github_username_with_token <- function(token) {
   return(content$login)
 }
 
-get_user_organizations_with_username <- function(username, token) {
-  orgs_url <- sprintf("https://api.github.com/users/%s/orgs", username)
-  orgs <- GET(orgs_url, httr::config(token = token))
-  orgs_json <- jsonlite::fromJSON(httr::content(orgs, "text", encoding = "UTF-8"))
-  return(orgs_json$login)
+getNextLink <- function(response) {
+  link_header <- headers(response)[["link"]]
+  if (is.null(link_header)) {
+    return(NULL)
+  }
+
+  links <- strsplit(link_header, ",")[[1]]
+  next_link <- grep("<(.+)>; rel=\"next\"", links, value = TRUE)
+
+  if (length(next_link) > 0) {
+    sub(".*<(.+)>; rel=\"next\".*", "\\1", next_link)
+  } else {
+    NULL
+  }
+}
+
+is_user_part_of_org <- function(token, organization, username) {
+  base_url <- paste0('https://api.github.com/orgs/', organization, '/members')
+  all_members <- c()
+  next_url <- base_url
+
+  while (length(next_url) > 0) {
+    response <- GET(next_url, httr::config(token = token))
+
+    if (status_code(response) == 200) {
+      members <- content(response, "parsed")
+      member_logins <- sapply(members, function(member) member$login)
+      all_members <- c(all_members, member_logins)
+
+      next_url <- getNextLink(response)
+    } else {
+      return(FALSE)
+    }
+  }
+  return(username %in% all_members)
 }
 
 # process input data ------------------------------------------------------
@@ -254,9 +284,8 @@ server <- function(input, output, session) {
 
   oauth_token <- create_oauth_token(params$code)
   github_username <- get_github_username_with_token(oauth_token)
-  user_organizations <- get_user_organizations_with_username(github_username, oauth_token)
+  is_included <- is_user_part_of_org(oauth_token, AUTHORIZED_GITHUB_ORGANIZATION, github_username)
 
-  is_included <- AUTHORIZED_GITHUB_ORGANIZATION %in% user_organizations
   if (!is_included) {
     stop("Access denied: Your GitHub account does not belong to the correct organization.")
   }

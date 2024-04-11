@@ -2,13 +2,13 @@
 
 ## Quick Start
 
-1. Navigate to [aa-diffex.arcadiascience.com](aa-diffex.arcadiascience.com).
+1. Navigate to [aa-diffex.arcadiascience.com](https://aa-diffex.arcadiascience.com).
 2. Log in with your GitHub credentials and authorize the app.
-3. Select a model from the upper-most drop down menu & explore the graphs and analyses available in each tab. See the [Feature of the App](#features-of-the-app) section below for more information.
+3. Select a model from the upper-most drop-down menu & explore the graphs and analyses available in each tab. See the [Feature of the App](#features-of-the-app) section below for more information.
 
 ### Known bugs
 
-* If you refresh the page, it may grey out. Re-navigate to the url [aa-diffex.arcadiascience.com](aa-diffex.arcadiascience.com) and continue exploring.
+* If you refresh the page, it may grey out. Re-navigate to the URL [aa-diffex.arcadiascience.com](https://aa-diffex.arcadiascience.com) and continue exploring.
 * GitHub authentication is based on your organization membership. **You must be a member of the Arcadia-Science GitHub organization to get access to the app.** Ping the software team if you are not a member and they can grant you membership.
 
 ## Running and Developing Locally
@@ -72,7 +72,7 @@ Close all other private browsing tabs and windows before opening a new one and c
 
 These instructions assume that you will run the app from the command line.
 **Do not try and run the app from RStudio.**
-The GitHub authentication doesn't play well with RStudio -- RStudio tries to launch multiple (~100) new tabs for the app when it doesn't immediately launch because of the authenication page.
+The GitHub authentication doesn't play well with RStudio -- RStudio tries to launch multiple (~100) new tabs for the app when it doesn't immediately launch because of the authentication page.
 
 ## Running from a Docker container
 
@@ -109,7 +109,7 @@ Launch the app by clicking `6626:6626` in the "Port(s)" column.
 
 ## Overview of the App
 
-This Shiny application serves as an interactive tool for exploring differential gene expression results derived from two differential expression models built from publicly available short read RNA-seq data for the lone star tick _Amblyomma americanum_.
+This Shiny application serves as an interactive tool for exploring differential gene expression results derived from two differential expression models built from publicly available short-read RNA-seq data for the lone star tick _Amblyomma americanum_.
 
 ## Data Preparation
 
@@ -144,7 +144,7 @@ Each boxplot is overlaid with the scatter points representing the expression of 
 This tab reports on expression per condition, allowing users to filter genes based on their expression thresholds and percentiles.
 Users can view expression distribution and download tables of genes that are never, sometimes, or always expressed in the selected condition.
 
-## Trouble shooting and issues
+## Troubleshooting and issues
 
 Sometimes the Shiny app may freeze.
 In testing, this happened most frequently on the DE Analysis tab when trying to switch which data was plotted (e.g. switching models or adding user data).

@@ -108,15 +108,21 @@ rule split_paired_end_reads_fastp:
 ## Read quantification
 ##############################################
 
-# using EVM genome & genome annotation.
-# for now, downloaded by hand from S3 until available on zenodo.
-# documented for myself in a README on AWS in the inputs folder.
+rule download_transcriptome:
+    output: "inputs/Amblyomma_americanum_transcriptome_assembly_data.tar.gz"
+    shell:'''
+    curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_transcriptome_assembly_data.tar.gz?download=1
+    '''
 
-# rule download_transcriptome:
-# will add when there's a public download link
+rule decompress_transcriptome:
+    input: "inputs/Amblyomma_americanum_transcriptome_assembly_data.tar.gz"
+    output: "inputs/transcriptome_data/orthofuser_final_clean.fa.dammit.fasta"
+    shell:'''
+    tar xf {input} -C inputs/
+    '''
 
 rule index_transcriptome:
-    input: "inputs/assembly/orthofuser_final_clean.fa.dammit.fasta"
+    input: "inputs/transcriptome_data/orthofuser_final_clean.fa.dammit.fasta"
     output: "outputs/quantification/salmon_index/info.json"
     threads: 1
     params: indexdir = "outputs/quantification/salmon_index/"
@@ -149,19 +155,38 @@ rule salmon:
 
 # create a tx2gene file by mapping transcripts back to genome with a splice-aware long read aligner
 
+rule download_genome_gff_annotation:
+    output: "inputs/Amblyomma_americanum_annotation_data.tar.gz"
+    shell:'''
+    curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_annotation_data.tar.gz?download=1
+    '''
+
+rule decompress_genome_gff_annotation:
+    input: "inputs/Amblyomma_americanum_annotation_data.tar.gz"
+    output: "inputs/annotation_data/Amblyomma_americanum_filtered_assembly.evm.gff3"
+    shell:'''
+    tar xf {input} -C inputs/
+    '''
+
 rule convert_gff_to_gtf:
-    input: "inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gff3"
-    output: "inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf"
+    input: "inputs/annotation_data/Amblyomma_americanum_filtered_assembly.evm.gff3"
+    output: "inputs/annotation_data/Amblyomma_americanum_filtered_assembly.evm.gtf"
     conda: "envs/agat.yml"
     shell:'''
     agat_convert_sp_gff2gtf.pl --gff {input} -o {output}
     '''
 
+rule download_genome:
+    output: "inputs/genome/Amblyomma_americanum_filtered_assembly.fasta"
+    shell:'''
+    curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_filtered_assembly.fasta?download=1
+    '''
+
 rule map_transcripts_to_genome_with_ultra:
     input:
         genome="inputs/genome/Amblyomma_americanum_filtered_assembly.fasta",
-        gtf="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf",
-        txome="inputs/assembly/orthofuser_final_clean.fa.dammit.fasta"
+        gtf="inputs/annotation_data/Amblyomma_americanum_filtered_assembly.evm.gtf",
+        txome="inputs/transcriptome_data/orthofuser_final_clean.fa.dammit.fasta"
     output: "outputs/tx2gene/ultra/Amblyomma_americanum_filtered_assembly.sam"
     params: 
         outdir = "outputs/tx2gene/ultra/",
@@ -175,7 +200,7 @@ rule map_transcripts_to_genome_with_ultra:
 rule assign_transcripts_to_genes_by_overlaps_with_gtf_genes:
     input: 
         sam="outputs/tx2gene/ultra/Amblyomma_americanum_filtered_assembly.sam",
-        gtf="inputs/annotations/evm/Amblyomma_americanum_filtered_assembly.evm.gtf"
+        gtf="inputs/annotation_data/Amblyomma_americanum_filtered_assembly.evm.gtf"
     output: "outputs/tx2gene/tx2gene.tsv"
     conda: "envs/pysam.yml"
     shell:'''

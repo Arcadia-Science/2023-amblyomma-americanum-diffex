@@ -108,20 +108,20 @@ rule split_paired_end_reads_fastp:
 ## Read quantification
 ##############################################
 
-rule download_transcriptome:
+rule download_amblyomma_americanum_transcriptome:
     output: "inputs/Amblyomma_americanum_transcriptome_assembly_data.tar.gz"
     shell:'''
     curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_transcriptome_assembly_data.tar.gz?download=1
     '''
 
-rule decompress_transcriptome:
+rule decompress_amblyomma_americanum_transcriptome:
     input: "inputs/Amblyomma_americanum_transcriptome_assembly_data.tar.gz"
     output: "inputs/transcriptome_data/orthofuser_final_clean.fa.dammit.fasta"
     shell:'''
     tar xf {input} -C inputs/
     '''
 
-rule index_transcriptome:
+rule index_amblyomma_americanum_transcriptome:
     input: "inputs/transcriptome_data/orthofuser_final_clean.fa.dammit.fasta"
     output: "outputs/quantification/salmon_index/info.json"
     threads: 1
@@ -155,13 +155,13 @@ rule salmon:
 
 # create a tx2gene file by mapping transcripts back to genome with a splice-aware long read aligner
 
-rule download_genome_gff_annotation:
+rule download_amblyomma_americanum_genome_gff_annotation:
     output: "inputs/Amblyomma_americanum_annotation_data.tar.gz"
     shell:'''
     curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_annotation_data.tar.gz?download=1
     '''
 
-rule decompress_genome_gff_annotation:
+rule decompress_amblyomma_americanum_genome_gff_annotation:
     input: "inputs/Amblyomma_americanum_annotation_data.tar.gz"
     output: "inputs/annotation_data/Amblyomma_americanum_filtered_assembly.evm.gff3"
     shell:'''
@@ -176,7 +176,7 @@ rule convert_gff_to_gtf:
     agat_convert_sp_gff2gtf.pl --gff {input} -o {output}
     '''
 
-rule download_genome:
+rule download_amblyomma_americanum_genome:
     output: "inputs/genome/Amblyomma_americanum_filtered_assembly.fasta"
     shell:'''
     curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_filtered_assembly.fasta?download=1

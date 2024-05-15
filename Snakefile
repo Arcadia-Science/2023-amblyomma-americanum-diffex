@@ -13,6 +13,10 @@ RUN_ACCESSIONS = metadata_all["run_accession"].unique().tolist()
 # extract library names; some libraries are split between multiple SRA accessions
 ILLUMINA_LIB_NAMES = metadata_illumina["library_name"].unique().tolist()
 
+GENOME_URL = "https://zenodo.org/records/10870487/files/Amblyomma_americanum_filtered_assembly.fasta?download=1"
+GENOME_GFF_URL = "https://zenodo.org/records/10870487/files/Amblyomma_americanum_annotation_data.tar.gz?download=1"
+TRANSCRIPTOME_URL = "https://zenodo.org/records/10870487/files/Amblyomma_americanum_transcriptome_assembly_data.tar.gz?download=1"
+
 rule all:
     input:
         "shiny/input_data/dds_sex_tissue_blood_meal_hour.RDS",
@@ -110,8 +114,9 @@ rule split_paired_end_reads_fastp:
 
 rule download_amblyomma_americanum_transcriptome:
     output: "inputs/Amblyomma_americanum_transcriptome_assembly_data.tar.gz"
+    params: transcriptome_url = TRANSCRIPTOME_URL
     shell:'''
-    curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_transcriptome_assembly_data.tar.gz?download=1
+    curl -JLo {output} {params.transcriptome_url}
     '''
 
 rule decompress_amblyomma_americanum_transcriptome:
@@ -157,8 +162,9 @@ rule salmon:
 
 rule download_amblyomma_americanum_genome_gff_annotation:
     output: "inputs/Amblyomma_americanum_annotation_data.tar.gz"
+    params: genome_gff_url = GENOME_GFF_URL
     shell:'''
-    curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_annotation_data.tar.gz?download=1
+    curl -JLo {output} {params.genome_gff_url}
     '''
 
 rule decompress_amblyomma_americanum_genome_gff_annotation:
@@ -178,8 +184,9 @@ rule convert_gff_to_gtf:
 
 rule download_amblyomma_americanum_genome:
     output: "inputs/genome/Amblyomma_americanum_filtered_assembly.fasta"
+    params: genome_url = GENOME_URL
     shell:'''
-    curl -JLo {output} https://zenodo.org/records/10870487/files/Amblyomma_americanum_filtered_assembly.fasta?download=1
+    curl -JLo {output} {params.genome_url}
     '''
 
 rule map_transcripts_to_genome_with_ultra:

@@ -42,7 +42,11 @@ conda activate diffexshiny
 
 The Shiny app relies, on a couple environment variables.
 To get started, make a copy of the [.Renviron.dev](/shiny/.Renvrion.dev) and fill in the values.
-If you don't have access to the correct values, ping the software team.
+If you don't have access to the correct values, ping the software team. The definition of the environment variables is as follows:
+* `AUTHORIZED_GITHUB_ORGANIZATION` is the GitHub organization name that has access to the Shiny application. For example, `Arcadia-Science`.
+* `GITHUB_OAUTH_KEY`: OAuth key acquired from GitHub.
+* `GITHUB_OAUTH_SECRET`: OAuth secret corresponding to the key above, also acquired from GitHub.
+* `APP_URL`: URL/domain for the hosted Shiny application (or localhost in development). This is needed because GitHub needs to redirect back to the application upon authentication.
 
 ```
 cd shiny/ && cp .Renviron.dev .Renviron

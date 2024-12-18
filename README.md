@@ -184,11 +184,6 @@ We tried a lot of different approaches to get a gene count matrix, summarized be
 Given these experiments, we decided to use to map against the transcriptome (since it had higher mapping rates, see [20231027-comparing-counting-methods.ipynb](./notebooks/20231027-comparing-counting-methods.ipynb)) and to assign genes to transcripts based on the gene each transcript overlapped when mapped against the genome.
 We aren't thrilled with this outcome, as it requires an annotated reference genome, but think it was a good enough approach to use in this project.
 
-#### Figuring out what samples can be compared via differential expression analysis before formally analyzing those samples
-
-Using the data analyze in this repo, we tested whether we could determine which samples might be amenable to differential expression analysis before taking the time to produce a gene count matrix.
-We're trialing a k-mer based approach to perform this type of analysis in the repository [2023-check-rnaseq-for-diffex](https://github.com/Arcadia-Science/2023-check-rnaseq-for-diffex).
-
 ## About the GitHub repository 
 
 ### Repository Structure
@@ -198,7 +193,7 @@ We're trialing a k-mer based approach to perform this type of analysis in the re
 - `envs/`: Directory containing conda environment files for software dependencies.
 - `Snakefile`: The main workflow script orchestrating the analysis.
 - `notebooks`: Directory containing analysis notebooks. These notebooks are scratch analyses that were used to determine the best next steps for the Snakemake pipeline or for visualizations to include in the [Shiny App](./shiny).
-- `shiny`: Directory containing the code and data required to run the *A. americanum* Differential Expression Explorer Shiny App. Also contains the instructions for running the app locally or via the internet. 
+- `shiny`: Directory containing the code and data required to run the *A. americanum* Differential Expression Explorer Shiny App. Also contains the instructions for running the app locally. 
 
 ### Workflow
 
@@ -261,10 +256,3 @@ This can be changed on line 4 of the [Snakefile](./Snakefile).
 ## Contributing
 
 See [this guide](https://github.com/Arcadia-Science/arcadia-software-handbook/blob/main/guides-and-standards/guide-credit-for-contributions.md) to see how we recognize feedback and contributions on our code.
-
-## IP decision and pub
-
-Currently, we have been advised to keep this GitHub repo private and to not pub out this project.
-This is because the differential expression analysis we performed is trivial and does not itself produce interesting and share-able biological insights, while the repo houses a [Shiny App](./shiny) that may be considered an asset for Trove.
-The IP guidance may change over time.
-In the mean time, the READMEs in this repository serve as the main documentation for the project, alongside the Notion Road maps in the Software Documentation section.

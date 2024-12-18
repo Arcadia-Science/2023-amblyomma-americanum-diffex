@@ -14,78 +14,6 @@ library(httr)
 options(shiny.host = "0.0.0.0")
 options(shiny.port = 8100)
 
-# OAuth config + functions
-# Inspiration for the OAuth setup:
-# https://gist.github.com/hadley/144c406871768d0cbe66b0b810160528
-
-AUTHORIZED_GITHUB_ORGANIZATION <- Sys.getenv("AUTHORIZED_GITHUB_ORGANIZATION")
-oauth_app <- httr::oauth_app("shinygithub",
-  key = Sys.getenv("GITHUB_OAUTH_KEY"),
-  secret = Sys.getenv("GITHUB_OAUTH_SECRET"),
-  redirect_uri = Sys.getenv("APP_URL")
-)
-oauth_endpoint <- httr::oauth_endpoints("github")
-# This defines the OAuth scope for GitHub. Empty scope
-# (read access to user profiles) is sufficient for our needs
-oauth_scope <- "read:org"
-
-is_auth_code_present_in_query <- function(params) {
-  return(!is.null(params$code))
-}
-
-create_oauth_token <- function(code) {
-  token <- httr::oauth2.0_token(
-    app = oauth_app,
-    endpoint = oauth_endpoint,
-    credentials = httr::oauth2.0_access_token(oauth_endpoint, oauth_app, code),
-    cache = FALSE
-  )
-  return(token)
-}
-
-get_github_username_with_token <- function(token) {
-  resp <- GET("https://api.github.com/user", httr::config(token = token))
-  content <- jsonlite::fromJSON(httr::content(resp, "text", encoding = "UTF-8"))
-  return(content$login)
-}
-
-get_next_link <- function(response) {
-  link_header <- headers(response)[["link"]]
-  if (is.null(link_header)) {
-    return(NULL)
-  }
-
-  links <- strsplit(link_header, ",")[[1]]
-  next_link <- grep("<(.+)>; rel=\"next\"", links, value = TRUE)
-
-  if (length(next_link) > 0) {
-    sub(".*<(.+)>; rel=\"next\".*", "\\1", next_link)
-  } else {
-    NULL
-  }
-}
-
-is_user_part_of_org <- function(token, organization, username) {
-  base_url <- paste0("https://api.github.com/orgs/", organization, "/members")
-  all_members <- c()
-  next_url <- base_url
-
-  while (length(next_url) > 0) {
-    response <- GET(next_url, httr::config(token = token))
-
-    if (status_code(response) == 200) {
-      members <- content(response, "parsed")
-      member_logins <- sapply(members, function(member) member$login)
-      all_members <- c(all_members, member_logins)
-
-      next_url <- get_next_link(response)
-    } else {
-      return(FALSE)
-    }
-  }
-  return(username %in% all_members)
-}
-
 # process input data ------------------------------------------------------
 
 # read in and process annotation data
@@ -299,16 +227,6 @@ above."
   )
 )
 
-#ui_with_auth <- function(req) {
- # if (!is_auth_code_present_in_query(parseQueryString(req$QUERY_STRING))) {
-  #  url <- httr::oauth2.0_authorize_url(oauth_endpoint, oauth_app, scope = oauth_scope)
-   # redirect <- sprintf("location.replace(\"%s\");", url)
-    #tags$script(HTML(redirect))
-  #} else {
-   # ui
-  #}
-#}
-
 # server logic ------------------------------------------------------------
 
 server <- function(input, output, session) {
@@ -316,21 +234,6 @@ server <- function(input, output, session) {
   output$welcome <- renderText({
     "Welcome to the app!"
   })
-
-#server <- function(input, output, session) {
- # params <- parseQueryString(isolate(session$clientData$url_search))
- # if (!is_auth_code_present_in_query(params)) {
-  #  return()
-  #}
-
-  #oauth_token <- create_oauth_token(params$code)
-  #github_username <- get_github_username_with_token(oauth_token)
-  #is_included <- is_user_part_of_org(oauth_token, AUTHORIZED_GITHUB_ORGANIZATION, github_username)
-
-  #if (!is_included) {
-   # stop("Access denied: Your GitHub account does not belong to the correct organization.")
-  #}
-
 
   # Reactive expression to load and process the selected model
   selected_model_data <- reactive({

@@ -172,17 +172,20 @@ ui <- fluidPage(
             numericInput("log2FoldChange_filter", "Filter by log2FC", min = -5, max = 5, value = 1),
             bsTooltip(
               id = "log2FoldChange_filter",
-              title = "A threshold of 1 or -1 (corresponding to 2-fold up or down changes) is often used as a starting point. This threshold can help filter out genes with small changes in expression that may not be biologically meaningful."
+              title = "A threshold of 1 or -1 (corresponding to 2-fold up or down changes) is often used as a starting point. This threshold can help filter out genes 
+with small changes in expression that may not be biologically meaningful."
             ),
             numericInput("padj_filter", "Filter by adjusted p-value", min = 0, max = 1, value = 0.05),
             bsTooltip(
               id = "padj_filter",
-              title = "A threshold of 0.05 is most common, although values ranging from 0.01 to 0.1 are also used. Lower values are more stringent and result in fewer false positivies but possibly more false negatives."
+              title = "A threshold of 0.05 is most common, although values ranging from 0.01 to 0.1 are also used. Lower values are more stringent and result in fewer 
+false positivies but possibly more false negatives."
             ),
             numericInput("basemean_filter", "Filter by base mean count", min = 5, max = 10000000, value = 10),
             bsTooltip(
               id = "basemean_filter",
-              title = "A commonly-used threshold is a base mean count of 10 or higher and this value should not drop below 5 without strong justification. This threshold helps to filter out genes with very low expression, which may be more prone to statistical noise."
+              title = "A commonly-used threshold is a base mean count of 10 or higher and this value should not drop below 5 without strong justification. This threshold 
+helps to filter out genes with very low expression, which may be more prone to statistical noise."
             ),
             selectInput("condition1", "Condition 1", choices = NULL, multiple = FALSE),
             selectInput("condition2", "Condition 2", choices = NULL, multiple = FALSE),
@@ -194,7 +197,8 @@ ui <- fluidPage(
               "A join will be executed on the 'gene_name' column, so please ensure your file has a column named 'gene_name' with gene identifiers formatted as",
               "'Amblyomma-americanum_evm.model.contig-XXXXX-X.X'",
               "Once the file is uploaded, you can select a column from your file to color the points in the output plot.",
-              "If you do not upload a file, points will be colored by significance of differential expression results, inferrered from the filtering criteria specified above."
+              "If you do not upload a file, points will be colored by significance of differential expression results, inferrered from the filtering criteria specified 
+above."
             ),
             fileInput("file", "Choose CSV File",
               accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv")
@@ -295,31 +299,37 @@ ui <- fluidPage(
   )
 )
 
-ui_with_auth <- function(req) {
-  if (!is_auth_code_present_in_query(parseQueryString(req$QUERY_STRING))) {
-    url <- httr::oauth2.0_authorize_url(oauth_endpoint, oauth_app, scope = oauth_scope)
-    redirect <- sprintf("location.replace(\"%s\");", url)
-    tags$script(HTML(redirect))
-  } else {
-    ui
-  }
-}
+#ui_with_auth <- function(req) {
+ # if (!is_auth_code_present_in_query(parseQueryString(req$QUERY_STRING))) {
+  #  url <- httr::oauth2.0_authorize_url(oauth_endpoint, oauth_app, scope = oauth_scope)
+   # redirect <- sprintf("location.replace(\"%s\");", url)
+    #tags$script(HTML(redirect))
+  #} else {
+   # ui
+  #}
+#}
 
 # server logic ------------------------------------------------------------
 
 server <- function(input, output, session) {
-  params <- parseQueryString(isolate(session$clientData$url_search))
-  if (!is_auth_code_present_in_query(params)) {
-    return()
-  }
+  # Render welcome message
+  output$welcome <- renderText({
+    "Welcome to the app!"
+  })
 
-  oauth_token <- create_oauth_token(params$code)
-  github_username <- get_github_username_with_token(oauth_token)
-  is_included <- is_user_part_of_org(oauth_token, AUTHORIZED_GITHUB_ORGANIZATION, github_username)
+#server <- function(input, output, session) {
+ # params <- parseQueryString(isolate(session$clientData$url_search))
+ # if (!is_auth_code_present_in_query(params)) {
+  #  return()
+  #}
 
-  if (!is_included) {
-    stop("Access denied: Your GitHub account does not belong to the correct organization.")
-  }
+  #oauth_token <- create_oauth_token(params$code)
+  #github_username <- get_github_username_with_token(oauth_token)
+  #is_included <- is_user_part_of_org(oauth_token, AUTHORIZED_GITHUB_ORGANIZATION, github_username)
+
+  #if (!is_included) {
+   # stop("Access denied: Your GitHub account does not belong to the correct organization.")
+  #}
 
 
   # Reactive expression to load and process the selected model
@@ -774,4 +784,5 @@ server <- function(input, output, session) {
 
 # run server --------------------------------------------------------------
 
-shinyApp(ui = ui_with_auth, server = server)
+shinyApp(ui = ui, server = server)
+

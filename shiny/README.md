@@ -1,24 +1,11 @@
 # Differential Expression Explorer Shiny App for _Amblyomma americanum_
 
-## Quick Start
-
-1. Navigate to [aa-diffex.arcadiascience.com](https://aa-diffex.arcadiascience.com).
-2. Log in with your GitHub credentials and authorize the app.
-3. Select a model from the upper-most drop-down menu & explore the graphs and analyses available in each tab. See the [Feature of the App](#features-of-the-app) section below for more information.
-
-### Known bugs
-
-* If you refresh the page, it may grey out. Re-navigate to the URL [aa-diffex.arcadiascience.com](https://aa-diffex.arcadiascience.com) and continue exploring.
-* GitHub authentication is based on your organization membership. **You must be a member of the Arcadia-Science GitHub organization to get access to the app.** Ping the software team if you are not a member and they can grant you membership.
-
 ## Running and Developing Locally
 
 Below we provide instructions for how to run the Shiny app locally.
 This is useful if you want to add new functionality to the app.
 
 First, clone the repository to your local computer.
-Because this is a private repo, GitHub will authenticate your credentials before it allows you to clone.
-If you [followed this lesson](https://training.arcadiascience.com/workshops/20220920-intro-to-git-and-github/lesson/) to set up git on your computer, the authentication should happen automatically.
 
 ```
 git clone git@github.com:Arcadia-Science/2023-amblyomma-americanum-diffex.git
@@ -40,18 +27,6 @@ mamba env create -n diffexshiny -f environment.yml
 conda activate diffexshiny
 ```
 
-The Shiny app relies, on a couple environment variables.
-To get started, make a copy of the [.Renviron.dev](/shiny/.Renvrion.dev) and fill in the values.
-If you don't have access to the correct values, ping the software team. The definition of the environment variables is as follows:
-* `AUTHORIZED_GITHUB_ORGANIZATION` is the GitHub organization name that has access to the Shiny application. For example, `Arcadia-Science`.
-* `GITHUB_OAUTH_KEY`: OAuth key acquired from GitHub.
-* `GITHUB_OAUTH_SECRET`: OAuth secret corresponding to the key above, also acquired from GitHub.
-* `APP_URL`: URL/domain for the hosted Shiny application (or localhost in development). This is needed because GitHub needs to redirect back to the application upon authentication.
-
-```
-cd shiny/ && cp .Renviron.dev .Renviron
-```
-
 To run the Shiny app, execute the following command:
 
 ```
@@ -66,23 +41,12 @@ Listening on http://0.0.0.0:8100
 ```
 
 Copy and paste the URL into your browser of choice and the Shiny app should launch.
-Even when running locally, the app expects you to authenticate.
-When the app launches, you should see a GitHub login screen.
-Log in and authorize the app.
-You should be redirected to the Shiny app after logging in.
-
-If you have any trouble logging in, try and run the app from a new Private Browser/Incognito window.
-Close all other private browsing tabs and windows before opening a new one and copy and pasting the Shiny app URL into the tab.
 
 These instructions assume that you will run the app from the command line.
-**Do not try and run the app from RStudio.**
-The GitHub authentication doesn't play well with RStudio -- RStudio tries to launch multiple (~100) new tabs for the app when it doesn't immediately launch because of the authentication page.
 
 ## Running from a Docker container
 
 First, clone the repository to your local computer.
-Because this is a private repo, GitHub will authenticate your credentials before it allows you to clone.
-If you [followed this lesson](https://training.arcadiascience.com/workshops/20220920-intro-to-git-and-github/lesson/) to set up git on your computer, the authentication should happen automatically.
 
 ```
 git clone git@github.com:Arcadia-Science/2023-amblyomma-americanum-diffex.git
@@ -99,8 +63,6 @@ Launch Docker Desktop and then navigate to the Terminal and build the Docker con
 ```
 docker build --progress=plain --platform linux/x86_64 -t diffexshiny .
 ```
-
-(note that this GitHub repo contains private data, so we have not uploaded the Docker container to Docker Hub.)
 
 Once the Docker container is done building, launch it in a headless state to the 8100 port.
 
@@ -152,14 +114,12 @@ Users can view expression distribution and download tables of genes that are nev
 
 Sometimes the Shiny app may freeze.
 In testing, this happened most frequently on the DE Analysis tab when trying to switch which data was plotted (e.g. switching models or adding user data).
-If this happens:
-
-* **When running in the browser:** exit the tab and re-launch the URL in a new tab.
-* **When running locally:** the best thing to do is to exit the browser tab, kill the Shiny app by pressing <kbd>ctrl</kbd> + <kbd>c</kbd>, and to relaunch it with the R command `R -e "shiny::runApp('app.R', port = 8100)"`.
+If this happens the best thing to do is to exit the browser tab, kill the Shiny app by pressing <kbd>ctrl</kbd> + <kbd>c</kbd>, and to relaunch it with the R command `R 
+-e "shiny::runApp('app.R', port = 8100)"`.
 
 Then, make sure the first data you plot in the DE Analysis tab is the data that froze the app.
 
 ## Next Steps
 
 We don't have any next steps planned for the app.
-If you have ideas about missing functionality or data, talk to the software team or file and issue on the repo.
+If you have ideas about missing functionality or data, please file an issue on the repo.

@@ -84,6 +84,10 @@ The folder contains metadata associated with the experiment, DESeq2 differential
 
 ## Features of the App
 
+### Converting from GenBank Protein IDs
+
+We have provided a [mapping table](./mapped_gene_names_GCA_030143305.2.csv) that enables conversion from the _Amblyomma americanum_ GCA_030143305.2 GenBank protein IDs (e.g. V5799_000197) to the gene names used by the Shiny app (e.g. Amblyomma-americanum_evm.model.contig-93311-1.1).
+
 ### Model Selection
 
 Users can select one of two differential expression models to explore: `sex_tissue` or `sex_tissue_blood_meal_hour`.

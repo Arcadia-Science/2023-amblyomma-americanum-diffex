@@ -688,4 +688,3 @@ server <- function(input, output, session) {
 # run server --------------------------------------------------------------
 
 shinyApp(ui = ui, server = server)
-

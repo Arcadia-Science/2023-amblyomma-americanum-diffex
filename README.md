@@ -1,6 +1,7 @@
 # Differential Expression Analysis of *Amblyomma americanum* Data
 
-This repository contains the workflow for performing differential expression analysis on publicly available *Amblyomma americanum* data. The repo accompanies the pub, ["An interactive visualization tool for *Amblyomma americanum* differential expression data"](https://doi.org/10.57844/arcadia-6833-4117).
+This repository contains the workflow for performing differential expression analysis on publicly available *Amblyomma americanum* data.
+The repo accompanies the pub, ["An interactive visualization tool for *Amblyomma americanum* differential expression data."](https://doi.org/10.57844/arcadia-6833-4117)
 
 ## Overview of the project and the results
 
